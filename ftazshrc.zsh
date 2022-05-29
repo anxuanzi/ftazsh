@@ -3,7 +3,7 @@ export TERM="xterm-256color"
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
 # Path to your oh-my-zsh installation.
-export ZSH=$HOME/.config/ezsh/oh-my-zsh
+export ZSH=$HOME/.config/ftazsh/oh-my-zsh
 
 # Set name of the theme to load. Optionally, if you set this to "random"
 # it'll load a random theme each time that oh-my-zsh is loaded.
@@ -97,7 +97,7 @@ plugins=(
     )
 #plugins+=(zsh-nvm)
 
-# source $ZSH/oh-my-zsh.sh          # This is now run in .zshrc after importing user configs from ~/.config/ezsh/zshrc/* files 
+# source $ZSH/oh-my-zsh.sh          # This is now run in .zshrc after importing user configs from ~/.config/ftazsh/zshrc/* files 
 
 # User configuration
 
@@ -131,12 +131,12 @@ plugins=(
 # Add to PATH to Install and run programs with "pip install --user"
 export PATH=$PATH:~/.local/bin
 
-export PATH=$PATH:~/.config/ezsh/bin
+export PATH=$PATH:~/.config/ftazsh/bin
 
 NPM_PACKAGES="${HOME}/.npm"
 PATH="$NPM_PACKAGES/bin:$PATH"
 
-[[ -s "$HOME/.config/ezsh/marker/marker.sh" ]] && source "$HOME/.config/ezsh/marker/marker.sh"
+[[ -s "$HOME/.config/ftazsh/marker/marker.sh" ]] && source "$HOME/.config/ftazsh/marker/marker.sh"
 
 autoload -U compinit && compinit -C -d ~/.cache/zsh/.zcompdump        # zsh-completions
 # autoload bashcompinit                 # bash completions
