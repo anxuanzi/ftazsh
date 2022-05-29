@@ -1,4 +1,4 @@
-# ezsh
+# ftazsh
 A simple script to setup an awesome shell environment.
 Quickly install and setup zsh and oh-my-zsh (https://github.com/robbyrussell/oh-my-zsh) with
 * powerlevel10k theme (https://github.com/romkatv/powerlevel10k)
@@ -12,7 +12,7 @@ Quickly install and setup zsh and oh-my-zsh (https://github.com/robbyrussell/oh-
 * marker (https://github.com/pindexis/marker)
 * todotxt (https://github.com/todotxt/todo.txt-cli)
 
-Sets following useful aliases and ohmyzsh plugins. **You can add more or overwrite these in your personal zsh config files under `~/.config/ezsh/zshrc/`** 
+Sets following useful aliases and ohmyzsh plugins. **You can add more or overwrite these in your personal zsh config files under `~/.config/ftazsh/zshrc/`** 
 * l="ls -lah"         - just type "l" instead of "ls -lah"
 * alias k="k -h"	  - show human readable filesizes, in kb, mb etc
 * e="exit"
@@ -30,16 +30,6 @@ Sets following useful aliases and ohmyzsh plugins. **You can add more or overwri
 * ipgeo - (curl "http://api.db-ip.com/v2/free/$1")    - finds geo location from IP
 * corona - (curl "https://corona-stats.online/")      - shows corona virus spread live stats
 
-## Demo
-
-Command prompt looks like this (easily customize it by placing your configs in ~/.config/ezsh/zshrc/)
-![prompt](https://user-images.githubusercontent.com/8462091/43674765-8bb13a76-9817-11e8-8b7b-16b8b1998408.png)
-user :  directory  :  git stats : last command exit code                     free memory: load : time
-
-Watch this to get an idea of what your Shell (well, life!) could be like!!
-
-[![asciicast](https://asciinema.org/a/225226.svg)](https://asciinema.org/a/225226)
-
 
 ## Installation
 Requirements:
@@ -47,11 +37,11 @@ Requirements:
 * `python3` or `python` is required to run option '-c' which copies history from .bash_history
 
 ``` bash
-git clone https://github.com/jotyGill/ezsh
-cd ezsh
+git clone https://github.com/anxuanzi/ftazsh
+cd ftazsh
 ./install.sh -c        # only run with '-c' the first time, running multiple times will duplicate history entries
 ```
-This will install the setup under `~/.config/ezsh/`
+This will install the setup under `~/.config/ftazsh/`
 Change your terminal's fonts to either "RobotoMono Nerd Font" or "Hack Nerd Font" or "DejaVu Sans Mono Nerd Fonts".
 You can also manually install Nerd Fonts of your choice.
 
@@ -62,9 +52,9 @@ You can also manually install Nerd Fonts of your choice.
 
 * marker's shortcut "Ctr+t" clashed with fzf so I rebound it to "Ctr +b"
 
-* All oh-my-zsh plugins are installed under ~/.config/ezsh/oh-my-zsh/plugin, Other tools (fzf,marker,todo) are installed in ~/.config/ezsh/
+* All oh-my-zsh plugins are installed under ~/.config/ftazsh/oh-my-zsh/plugin, Other tools (fzf,marker,todo) are installed in ~/.config/ftazsh/
 
 * The look of the shell can be very easily customised[https://github.com/bhilburn/powerlevel9k#prompt-customization] by overwriting POWERLEVEL10K settings
-in your personal config file under ~/.config/ezsh/zshrc/ . See my setup under example/personal_rc.zsh
+in your personal config file under ~/.config/ftazsh/zshrc/ . See my setup under example/personal_rc.zsh
 
 Suggestions about more cool tools are always welcome :)
