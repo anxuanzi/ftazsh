@@ -64,6 +64,7 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 # Custom plugins may be added to $ZSH/custom/plugins/
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
+    macos
     zsh-autosuggestions     # Fish-like autosuggestions
     zsh-syntax-highlighting # Syntax highlighting for commands
     history-substring-search # Fish-like history search

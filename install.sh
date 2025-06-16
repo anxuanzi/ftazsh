@@ -25,50 +25,50 @@ main() {
     print_message "Starting ftazsh installation...\n"
     
     # Step 1: Install dependencies
-    print_message "Step 1: Installing dependencies...\n"
+    print_message "Installing dependencies...\n"
     if ! install_dependencies; then
         print_error "Failed to install dependencies. Exiting.\n"
         exit 1
     fi
     
     # Step 2: Backup existing .zshrc and create directories
-    print_message "Step 2: Setting up directories...\n"
+    print_message "Setting up directories...\n"
     backup_zshrc
     create_directories
+
+    # Step 7: Set up ZDOTDIR
+    print_message "Setting up ZDOTDIR...\n"
+    setup_zdotdir
     
     # Step 3: Install Oh My Zsh and plugins
-    print_message "Step 3: Installing Oh My Zsh and plugins...\n"
+    print_message "Installing Oh My Zsh and plugins...\n"
     install_oh_my_zsh
     install_zsh_plugins
     install_powerlevel10k
     
     # Step 4: Install additional tools
-    print_message "Step 4: Installing additional tools...\n"
+    print_message "Installing additional tools...\n"
     install_fzf
     install_marker
     
     # Step 5: Install Nerd Fonts
-    print_message "Step 5: Installing Nerd Fonts...\n"
+    print_message "Installing Nerd Fonts...\n"
     install_nerd_fonts
     
     # Step 6: Copy configuration files
-    print_message "Step 6: Copying configuration files...\n"
+    print_message "Copying configuration files...\n"
     copy_config_files
-    
-    # Step 7: Set up ZDOTDIR
-    print_message "Step 7: Setting up ZDOTDIR...\n"
-    setup_zdotdir
     
     # Step 8: Copy bash history to zsh history if requested
     if [[ $1 == "--cp-hist" ]] || [[ $1 == "-c" ]]; then
-        print_message "Step 8: Copying bash history to zsh history...\n"
+        print_message "Copying bash history to zsh history...\n"
         copy_bash_history
     else
-        print_message "Step 8: Skipping bash history copy (use --cp-hist or -c to enable)\n"
+        print_message "Skipping bash history copy (use --cp-hist or -c to enable)\n"
     fi
     
     # Step 9: Change default shell to ZSH
-    print_message "Step 9: Changing default shell to ZSH...\n"
+    print_message "Changing default shell to ZSH...\n"
     print_message "\nSudo access is needed to change default shell\n"
     change_default_shell
     
