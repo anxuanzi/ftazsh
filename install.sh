@@ -3,18 +3,30 @@
 # This script installs and configures a comprehensive ZSH setup with Oh My Zsh,
 # Powerlevel10k theme, Nerd Fonts, and various useful plugins.
 
+print_message() {
+    echo -e "🔵  $1"
+}
+
+print_success() {
+    echo -e "✅  $1"
+}
+
+print_error() {
+    echo -e "❌  $1" >&2
+}
+
 # Check if required dependencies are already installed
 if command -v zsh &> /dev/null && command -v git &> /dev/null && command -v wget &> /dev/null; then
-    echo -e "ZSH, Git, and wget are already installed\n"
+    print_success "ZSH, Git, and wget are already installed\n"
 else
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS specific installation
         if ! command -v brew &> /dev/null; then
-            echo "Homebrew is not installed. Installing Homebrew..."
+            print_message "Homebrew is not installed. Installing Homebrew..."
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
             # Configure Homebrew in the user's profile
-            echo "Configuring Homebrew in user's profile..."
+            print_message "Configuring Homebrew in user's profile..."
             echo >> "$HOME/.zprofile"
 
             # Detect Homebrew location based on architecture
@@ -33,27 +45,27 @@ else
                     echo "eval \"\$(${BREW_PATH} shellenv)\"" >> "$HOME/.zprofile"
                     eval "$(${BREW_PATH} shellenv)"
                 else
-                    echo "Warning: Could not determine Homebrew location"
+                    print_error "Warning: Could not determine Homebrew location"
                 fi
             fi
         fi
         if brew install git zsh wget; then
-            echo -e "zsh, wget, and git installed with Homebrew\n"
+            print_success "zsh, wget, and git installed with Homebrew\n"
         else
-            echo -e "Failed to install packages with Homebrew\n" && exit
+            print_error "Failed to install packages with Homebrew\n" && exit
         fi
     else
         # Linux specific installation
         if sudo apt install -y zsh git wget || sudo pacman -S zsh git wget || sudo dnf install -y zsh git wget || sudo yum install -y zsh git wget || pkg install git zsh wget ; then
-            echo -e "zsh, wget, and git installed\n"
+            print_success "zsh, wget, and git installed\n"
         else
-            echo -e "Please install the following packages first, then try again: zsh git wget \n" && exit
+            print_error "Please install the following packages first, then try again: zsh git wget \n" && exit
         fi
     fi
 fi
 
 if mv -n ~/.zshrc ~/.zshrc-backup-$(date +"%Y-%m-%d"); then # backup .zshrc
-    echo -e "Backed up the current .zshrc to .zshrc-backup-$(date +"%Y-%m-%d")\n"
+    print_success "Backed up the current .zshrc to .zshrc-backup-$(date +"%Y-%m-%d")\n"
 fi
 
 # Create main configuration directory
@@ -61,16 +73,16 @@ mkdir -p ~/.config/ftazsh       # the setup will be installed in here
 
 # Check for previous quickzsh installation (predecessor to ftazsh)
 if [ -d ~/.quickzsh ]; then
-    echo -e "\n PREVIOUS SETUP FOUND AT '~/.quickzsh'. PLEASE MANUALLY MOVE ANY FILES YOU'D LIKE TO '~/.config/ftazsh' \n"
+    print_message "\n PREVIOUS SETUP FOUND AT '~/.quickzsh'. PLEASE MANUALLY MOVE ANY FILES YOU'D LIKE TO '~/.config/ftazsh' \n"
 fi
 
 # Install or update Oh My Zsh
-echo -e "Installing oh-my-zsh\n"
+print_message "Installing oh-my-zsh\n"
 if [ -d ~/.config/ftazsh/oh-my-zsh ]; then
-    echo -e "oh-my-zsh is already installed\n"
+    print_success "oh-my-zsh is already installed\n"
     git -C ~/.config/ftazsh/oh-my-zsh remote set-url origin https://github.com/ohmyzsh/ohmyzsh.git
 elif [ -d ~/.oh-my-zsh ]; then
-    echo -e "oh-my-zsh is already installed at '~/.oh-my-zsh'. Moving it to '~/.config/ftazsh/oh-my-zsh'"
+    print_message "oh-my-zsh is already installed at '~/.oh-my-zsh'. Moving it to '~/.config/ftazsh/oh-my-zsh'"
     export ZSH="$HOME/.config/ftazsh/oh-my-zsh"
     mv ~/.oh-my-zsh ~/.config/ftazsh/oh-my-zsh
     git -C ~/.config/ftazsh/oh-my-zsh remote set-url origin https://github.com/ohmyzsh/ohmyzsh.git
@@ -128,11 +140,11 @@ fi
 
 # INSTALL FONTS
 
-echo -e "Installing Nerd Fonts version of Hack, Roboto Mono, DejaVu Sans Mono, and JetBrains Mono\n"
+print_message "Installing Nerd Fonts version of Hack, Roboto Mono, DejaVu Sans Mono, and JetBrains Mono\n"
 
 # Check if nerd-fonts directory already exists
 if [ -d ./nerd-fonts ]; then
-    echo -e "Nerd Fonts repository already exists, updating...\n"
+    print_message "Nerd Fonts repository already exists, updating...\n"
     cd ./nerd-fonts && git pull && cd ..
 else
     git clone --depth 1 https://github.com/ryanoasis/nerd-fonts.git
@@ -140,13 +152,13 @@ fi
 
 # Install the fonts
 if chmod +x ./nerd-fonts/install.sh && ./nerd-fonts/install.sh; then
-    echo -e "Nerd Fonts installed successfully\n"
+    print_success "Nerd Fonts installed successfully\n"
 else
-    echo -e "There was an issue installing Nerd Fonts\n"
+    print_error "There was an issue installing Nerd Fonts\n"
 fi
 
 # Clean up nerd-fonts repository to save space
-echo -e "Cleaning up Nerd Fonts repository...\n"
+print_message "Cleaning up Nerd Fonts repository...\n"
 rm -rf ./nerd-fonts
 
 # Install or update Powerlevel10k theme
@@ -181,16 +193,16 @@ fi
 
 # Run marker installation script
 if ~/.config/ftazsh/marker/install.py; then
-    echo -e "Installed Marker\n"
+    print_success "Installed Marker\n"
 else
-    echo -e "Marker Installation Had Issues\n"
+    print_error "Marker Installation Had Issues\n"
 fi
 # Return to original directory in case marker installation changed it
 cd "$(dirname "$0")"
 
 # Optional: Copy bash history to zsh history if requested
 if [[ $1 == "--cp-hist" ]] || [[ $1 == "-c" ]]; then
-    echo -e "\nCopying bash_history to zsh_history\n"
+    print_message "\nCopying bash_history to zsh_history\n"
     if command -v python &>/dev/null; then
         wget -q --show-progress https://gist.githubusercontent.com/muendelezaji/c14722ab66b505a49861b8a74e52b274/raw/49f0fb7f661bdf794742257f58950d209dd6cb62/bash-to-zsh-hist.py
         cat ~/.bash_history | python bash-to-zsh-hist.py >> ~/.zsh_history
@@ -199,11 +211,11 @@ if [[ $1 == "--cp-hist" ]] || [[ $1 == "-c" ]]; then
             wget -q --show-progress https://gist.githubusercontent.com/muendelezaji/c14722ab66b505a49861b8a74e52b274/raw/49f0fb7f661bdf794742257f58950d209dd6cb62/bash-to-zsh-hist.py
             cat ~/.bash_history | python3 bash-to-zsh-hist.py >> ~/.zsh_history
         else
-            echo "Python is not installed, can't copy bash_history to zsh_history\n"
+            print_error "Python is not installed, can't copy bash_history to zsh_history\n"
         fi
     fi
 else
-    echo -e "\nNot copying bash_history to zsh_history, as --cp-hist or -c is not supplied\n"
+    print_message "\nNot copying bash_history to zsh_history, as --cp-hist or -c is not supplied\n"
 fi
 # Return to original directory in case previous operations changed it
 cd "$(dirname "$0")"
@@ -215,13 +227,68 @@ cd "$(dirname "$0")"
 echo 'export ZDOTDIR=~/.config/ftazsh' >> ~/.zshenv
 
 # Final steps: Change default shell to ZSH and update Oh My Zsh
-echo -e "\nSudo access is needed to change default shell\n"
+print_message "\nSudo access is needed to change default shell\n"
 
-if chsh -s $(which zsh) && /bin/zsh -i -c 'omz update'; then
-    echo -e "Installation Successful, exit terminal and enter a new session"
-else
-    echo -e "Something went wrong during the final setup"
+
+# 1. Locate the Homebrew Zsh executable.
+local zsh_path
+if ! zsh_path=$(which zsh); then
+    print_error "Zsh not found in your PATH. Please install Zsh first (e.g., 'brew install zsh')."
+    exit 1
 fi
+
+# Check if it's the Homebrew path.
+if [[ "$zsh_path" != "/opt/homebrew/bin/zsh" ]] && [[ "$zsh_path" != "/usr/local/bin/zsh" ]]; then
+    print_message "The detected Zsh is at '$zsh_path', which doesn't seem to be a Homebrew installation."
+    print_message "The script will proceed, but this is intended for Homebrew-managed shells."
+fi
+
+print_message "Zsh is located at: $zsh_path"
+
+# 2. Check if the Zsh path is in /etc/shells.
+local shells_file="/etc/shells"
+if ! grep -q "^${zsh_path}$" "$shells_file"; then
+    print_message "'$zsh_path' is not listed in $shells_file."
+    print_message "We need to add it. This requires administrator privileges."
+
+    # 3. Add the Zsh path to /etc/shells using sudo.
+    # The 'tee' command is used to append to a file requiring root privileges.
+    if echo "$zsh_path" | sudo tee -a "$shells_file" > /dev/null; then
+        print_success "Successfully added '$zsh_path' to $shells_file."
+    else
+        print_error "Failed to add '$zsh_path' to $shells_file. Please check your permissions."
+        exit 1
+    fi
+else
+    print_success "'$zsh_path' is already in $shells_file."
+fi
+
+# 4. Change the shell.
+print_message "Attempting to change the default shell to '$zsh_path'..."
+if chsh -s "$zsh_path"; then
+    print_success "Default shell changed successfully."
+else
+    print_error "Failed to change the shell with 'chsh'. Please try running 'chsh -s $zsh_path' manually."
+    exit 1
+fi
+
+
+# 5. Update Oh My Zsh if it exists.
+# Check if the OMZ directory exists before trying to update.
+
+print_message "Updating Oh My Zsh..."
+# We run this in a subshell to avoid issues with the current script's environment.
+if /bin/zsh -i -c 'omz update'; then
+    print_success "Oh My Zsh update completed."
+else
+    # A failed update is not critical, so we'll just warn the user.
+    print_error "Oh My Zsh update command finished with a non-zero status. Check the output above."
+fi
+
+echo ""
+print_success "🎉 Installation successful!"
+print_message "Please exit this terminal and start a new session for the changes to take effect."
+
 # Return to original directory before exiting
 cd "$(dirname "$0")"
 exit
