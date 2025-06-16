@@ -1,19 +1,23 @@
-export TERM="xterm-256color"
-# If you come from bash you might have to change your $PATH.
-# export PATH=$HOME/bin:/usr/local/bin:$PATH
+# ftazshrc.zsh - Main configuration file for ftazsh
+# This file contains the core settings for the ftazsh framework
 
-# Path to your oh-my-zsh installation.
+#------------------------------------------------------------------------------
+# TERMINAL SETTINGS
+#------------------------------------------------------------------------------
+export TERM="xterm-256color"
+
+#------------------------------------------------------------------------------
+# OH MY ZSH CONFIGURATION
+#------------------------------------------------------------------------------
+# Path to your oh-my-zsh installation
 export ZSH=$HOME/.config/ftazsh/oh-my-zsh
 
-# Set name of the theme to load. Optionally, if you set this to "random"
-# it'll load a random theme each time that oh-my-zsh is loaded.
-# See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
-
-
-#POWERLEVEL9K_MODE='nerdfont-complete'
-
+# Theme configuration
 ZSH_THEME="powerlevel10k/powerlevel10k"
 
+#------------------------------------------------------------------------------
+# OH MY ZSH OPTIONS
+#------------------------------------------------------------------------------
 # Uncomment the following line to use case-sensitive completion.
 # CASE_SENSITIVE="true"
 
@@ -52,118 +56,102 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 # Would you like to use another custom folder than $ZSH/custom?
 # ZSH_CUSTOM=/path/to/new-custom-folder
 
-# Which plugins would you like to load? (plugins can be found in ~/.oh-my-zsh/plugins/*)
-# Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
-# Example format: plugins=(rails git textmate ruby lighthouse)
+#------------------------------------------------------------------------------
+# PLUGINS
+#------------------------------------------------------------------------------
+# Which plugins would you like to load?
+# Standard plugins can be found in $ZSH/plugins/
+# Custom plugins may be added to $ZSH/custom/plugins/
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
-    # zsh-completions   INSTALL METHOD CHANGED https://github.com/zsh-users/zsh-completions/issues/603
-    zsh-autosuggestions     # Disable if you are using Marker, otherwise enable
-    zsh-syntax-highlighting
-    history-substring-search
-    systemd
-    extract
-    z
-    sudo
-    fzf-tab
-    git
-    python
-    docker
-    # lol
-    pip
-    # pyenv
-    # redis-cli
-    # zsh-wakatime          # enable if you use wakatime with 'https://github.com/wbingli/zsh-wakatime'
-    )
-# Plugins can be added like into your own config file under ~/.config/ftazsh/zshrc/ like this:
-#plugins+=(zsh-nvm)
+    zsh-autosuggestions     # Fish-like autosuggestions
+    zsh-syntax-highlighting # Syntax highlighting for commands
+    history-substring-search # Fish-like history search
+    systemd                 # Systemd commands and aliases
+    extract                 # Extract various archive formats
+    z                       # Jump to frequently used directories
+    sudo                    # Press ESC twice to add sudo to previous command
+    fzf-tab                 # Tab completion with fzf
+    git                     # Git aliases and functions
+    python                  # Python aliases and functions
+    docker                  # Docker aliases and functions
+    pip                     # Pip completion and aliases
+    # Disabled plugins (remove # to enable)
+    # lol                   # Fun commands
+    # pyenv                 # Python version management
+    # redis-cli             # Redis CLI aliases and completion
+    # zsh-wakatime          # Enable if you use wakatime with 'https://github.com/wbingli/zsh-wakatime'
+)
+
+# Plugins can be added in your own config file under ~/.config/ftazsh/zshrc/ like this:
+# plugins+=(zsh-nvm)
 
 # Remove plugins from the default list above in your own config file using:
 # plugins=(${plugins:#pluginname})
-# plugins=(${plugins:#zsh-autosuggestions})
+# Example: plugins=(${plugins:#zsh-autosuggestions})
 
-# fpath+="${ZSH_CUSTOM:-"$ZSH/custom"}/plugins/zsh-completions/src"   # install zsh-completions, if you need it
+#------------------------------------------------------------------------------
+# HISTORY CONFIGURATION
+#------------------------------------------------------------------------------
+SAVEHIST=50000      # Save up to 50,000 lines in history (oh-my-zsh default is 10,000)
+#setopt hist_ignore_all_dups # Don't record duplicated entries in history during a single session
 
-# source $ZSH/oh-my-zsh.sh          # This is now run in .zshrc after importing user configs from ~/.config/ftazsh/zshrc/* files
-
-# User configuration
-
-# export MANPATH="/usr/local/man:$MANPATH"
-
-# You may need to manually set your language environment
-# export LANG=en_US.UTF-8
-
-# Preferred editor for local and remote sessions
-# if [[ -n $SSH_CONNECTION ]]; then
-#   export EDITOR='vim'
-# else
-#   export EDITOR='mvim'
-# fi
-
-# Compilation flags
-# export ARCHFLAGS="-arch x86_64"
-
-# ssh
-# export SSH_KEY_PATH="~/.ssh/rsa_id"
-
-# Set personal aliases, overriding those provided by oh-my-zsh libs,
-# plugins, and themes. Aliases can be placed here, though oh-my-zsh
-# users are encouraged to define aliases within the ZSH_CUSTOM folder.
-# For a full list of active aliases, run `alias`.
-#
-# Example aliases
-# alias zshconfig="mate ~/.zshrc"
-# alias ohmyzsh="mate ~/.oh-my-zsh"
-
+#------------------------------------------------------------------------------
+# PATH CONFIGURATION
+#------------------------------------------------------------------------------
 # Add to PATH to run programs installed with pipx or "pip install --user"
 export PATH=$PATH:~/.local/bin
 
-# To give this path preference instead of system paths to run the latest version of tools, add the following to your personal config. Due to security concerns this is not done by default.
+# To give this path preference instead of system paths to run the latest version of tools,
+# add the following to your personal config. Due to security concerns this is not done by default.
 # export PATH=~/.local/bin:$PATH
 
+# Add ftazsh bin directory to PATH
 export PATH=$PATH:~/.config/ftazsh/bin
 
+# Add npm packages to PATH
 NPM_PACKAGES="${HOME}/.npm"
 PATH="$NPM_PACKAGES/bin:$PATH"
 
+#------------------------------------------------------------------------------
+# TOOL CONFIGURATION
+#------------------------------------------------------------------------------
+# Marker - command bookmarker
 [[ -s "$HOME/.config/ftazsh/marker/marker.sh" ]] && source "$HOME/.config/ftazsh/marker/marker.sh"
 
-# autoload -U compinit && compinit -C -d ~/.cache/zsh/.zcompdump        # zsh-completions
-# autoload bashcompinit                 # bash completions
-# bashcompinit
+#------------------------------------------------------------------------------
+# ALIASES
+#------------------------------------------------------------------------------
+# Network aliases
+alias myip="wget -qO- https://wtfismyip.com/text"	# Quickly show external IP address
 
-
-# QuickZsh
-SAVEHIST=50000      #save upto 50,000 lines in history. oh-my-zsh default is 10,000
-#setopt hist_ignore_all_dups     # dont record duplicated entries in history during a single session
-
-alias myip="wget -qO- https://wtfismyip.com/text"	# quickly show external ip address
 # OS-specific aliases
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # macOS specific aliases
-    alias l="ls -lAhrtF"    # show all except . .. , sort by recent, / at the end of folders
+    alias l="ls -lAhrtF"    # Show all except . .. , sort by recent, / at the end of folders
 else
     # Linux specific aliases
-    alias l="ls --hyperlink=auto -lAhrtF"    # show all except . .. , sort by recent, / at the end of folders, clickable
+    alias l="ls --hyperlink=auto -lAhrtF"    # Show all except . .. , sort by recent, / at the end of folders, clickable
     alias ip="ip --color=auto"
 fi
 
+# General aliases
 alias e="exit"
 
-## Install EZA to use these. The better ls command
+# EZA aliases (better ls command)
 # To install eza: 
 # macOS: brew install eza
 # Linux: sudo apt install eza / sudo dnf install eza
 alias a='eza -la --git --colour-scale all -g --smart-group --icons always'  # The new ls; add --hyperlink if you like
 alias aa='eza -la --git --colour-scale all -g --smart-group --icons always -s modified -r' # Sort by newest
 
-
+#------------------------------------------------------------------------------
 # CUSTOM FUNCTIONS
-
-# cheat sheets (github.com/chubin/cheat.sh), find out how to use commands
-# example 'cheat tar'
-# for language specific question supply 2 args first for language, second as the question
-# eample: cheat python3 execute external program
+#------------------------------------------------------------------------------
+# Cheat sheets (github.com/chubin/cheat.sh), find out how to use commands
+# Example: cheat tar
+# For language specific questions supply 2 args: first for language, second as the question
+# Example: cheat python3 "execute external program"
 cheat() {
     if [ "$2" ]; then
         curl "https://cheat.sh/$1/$2+$3+$4+$5+$6+$7+$8+$9+${10}"
@@ -172,14 +160,16 @@ cheat() {
     fi
 }
 
-# Matrix screen saver! will run if you have installed "cmatrix"
+# Matrix screen saver! Will run if you have installed "cmatrix"
 # TMOUT=900
 # TRAPALRM() { if command -v cmatrix &> /dev/null; then cmatrix -sb; fi }
 
+# Run a speedtest from the command line
 speedtest() {
     curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python3 -
 }
 
+# Get a random dad joke
 dadjoke() {
     curl https://icanhazdadjoke.com
 }
@@ -194,6 +184,9 @@ ipgeo() {
     fi
 }
 
+#------------------------------------------------------------------------------
+# POWERLEVEL10K CONFIGURATION
+#------------------------------------------------------------------------------
 # Powerlevel10k configuration examples
 # Uncomment and modify these in your personal config file (~/.config/ftazsh/zshrc/my_config.zsh)
 

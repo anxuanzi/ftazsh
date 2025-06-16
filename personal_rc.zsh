@@ -1,4 +1,4 @@
-# Example personal ZSH configuration for ftazsh
+# Personal ZSH configuration for ftazsh
 # Place this file (or create your own) in ~/.config/ftazsh/zshrc/ directory
 # All files in this directory will be automatically sourced when your shell starts
 

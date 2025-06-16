@@ -51,6 +51,27 @@ ftazsh uses the following directory structure:
 └── marker/                 # Command bookmarker
 ```
 
+The repository itself is organized as follows:
+
+```
+ftazsh/                     # Repository root
+├── install.sh              # Main installation script
+├── .zshrc                  # Base .zshrc file (copied to user's home)
+├── ftazshrc.zsh            # Main configuration file
+├── p10k.zsh                # Powerlevel10k configuration
+├── scripts/                # Modular installation scripts
+│   ├── utils.sh            # Utility functions
+│   ├── dependencies.sh     # Dependencies installation
+│   ├── shell_config.sh     # Shell configuration
+│   ├── plugins_themes.sh   # Plugins and themes installation
+│   ├── fonts.sh            # Fonts installation
+│   ├── config_files.sh     # Configuration files installation
+│   └── history.sh          # History migration
+├── examples/               # Example configurations
+│   └── personal_rc.zsh     # Example personal configuration
+└── iterm2-profile.json     # iTerm2 profile for macOS users
+```
+
 ## Installation
 
 ### Requirements
@@ -124,7 +145,7 @@ function mkcd() {
 }
 ```
 
-See the `example-config/personal_rc.zsh` file for more examples.
+See the `examples/personal_rc.zsh` file for more examples.
 
 ### Customizing the Prompt
 
