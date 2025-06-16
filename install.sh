@@ -186,12 +186,12 @@ backup_zshrc() {
     fi
 }
 
-# Set up ZDOTDIR to point to the ftazsh config directory
-setup_zdotdir() {
-    # This allows zsh to find configuration files in ~/.config/ftazsh
-    echo 'export ZDOTDIR=~/.config/ftazsh' >> ~/.zshenv
-    print_success "Set ZDOTDIR to ~/.config/ftazsh in ~/.zshenv"
-}
+## Set up ZDOTDIR to point to the ftazsh config directory
+#setup_zdotdir() {
+#    # This allows zsh to find configuration files in ~/.config/ftazsh
+#    echo 'export ZDOTDIR=~/.config/ftazsh' >> ~/.zshenv
+#    print_success "Set ZDOTDIR to ~/.config/ftazsh in ~/.zshenv"
+#}
 
 # Create necessary directories for ftazsh
 create_directories() {
@@ -432,9 +432,9 @@ main() {
     backup_zshrc
     create_directories
 
-    # Step 3: Set up ZDOTDIR
-    print_message "Setting up ZDOTDIR...\n"
-    setup_zdotdir
+#    # Step 3: Set up ZDOTDIR
+#    print_message "Setting up ZDOTDIR...\n"
+#    setup_zdotdir
     
     # Step 4: Install Oh My Zsh and plugins
     print_message "Installing Oh My Zsh and plugins...\n"
