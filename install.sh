@@ -75,28 +75,28 @@ fi
 
 # zsh-autosuggestions: Fish-like autosuggestions for ZSH
 if [ -d ~/.config/ftazsh/oh-my-zsh/plugins/zsh-autosuggestions ]; then
-    cd ~/.config/ftazsh/oh-my-zsh/plugins/zsh-autosuggestions && git pull
+    cd ~/.config/ftazsh/oh-my-zsh/plugins/zsh-autosuggestions && git pull && cd -
 else
     git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions ~/.config/ftazsh/oh-my-zsh/plugins/zsh-autosuggestions
 fi
 
 # zsh-syntax-highlighting: Fish-like syntax highlighting for ZSH
 if [ -d ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-syntax-highlighting ]; then
-    cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-syntax-highlighting && git pull
+    cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-syntax-highlighting && git pull && cd -
 else
     git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-syntax-highlighting
 fi
 
 # zsh-completions: Additional completion definitions for ZSH
 if [ -d ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-completions ]; then
-    cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-completions && git pull
+    cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-completions && git pull && cd -
 else
     git clone --depth=1 https://github.com/zsh-users/zsh-completions ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-completions
 fi
 
 # zsh-history-substring-search: Fish-like history search for ZSH
 if [ -d ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-history-substring-search ]; then
-    cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-history-substring-search && git pull
+    cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-history-substring-search && git pull && cd -
 else
     git clone --depth=1 https://github.com/zsh-users/zsh-history-substring-search ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-history-substring-search
 fi
@@ -127,14 +127,14 @@ rm -rf ./nerd-fonts
 
 # Install or update Powerlevel10k theme
 if [ -d ~/.config/ftazsh/oh-my-zsh/custom/themes/powerlevel10k ]; then
-    cd ~/.config/ftazsh/oh-my-zsh/custom/themes/powerlevel10k && git pull
+    cd ~/.config/ftazsh/oh-my-zsh/custom/themes/powerlevel10k && git pull && cd -
 else
     git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/.config/ftazsh/oh-my-zsh/custom/themes/powerlevel10k
 fi
 
 # Install or update fzf (fuzzy finder)
 if [ -d ~/.config/ftazsh/fzf ]; then
-    cd ~/.config/ftazsh/fzf && git pull
+    cd ~/.config/ftazsh/fzf && git pull && cd -
     ~/.config/ftazsh/fzf/install --all --key-bindings --completion --no-update-rc
 else
     git clone --depth 1 https://github.com/junegunn/fzf.git ~/.config/ftazsh/fzf
@@ -143,14 +143,14 @@ fi
 
 # Install or update k plugin (directory listings for ZSH with git features)
 if [ -d ~/.config/ftazsh/oh-my-zsh/custom/plugins/k ]; then
-    cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/k && git pull
+    cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/k && git pull && cd -
 else
     git clone --depth 1 https://github.com/supercrabtree/k ~/.config/ftazsh/oh-my-zsh/custom/plugins/k
 fi
 
 # Install or update marker (bookmark your shell commands)
 if [ -d ~/.config/ftazsh/marker ]; then
-    cd ~/.config/ftazsh/marker && git pull
+    cd ~/.config/ftazsh/marker && git pull && cd -
 else
     git clone --depth 1 https://github.com/jotyGill/marker ~/.config/ftazsh/marker
 fi
@@ -161,6 +161,8 @@ if ~/.config/ftazsh/marker/install.py; then
 else
     echo -e "Marker Installation Had Issues\n"
 fi
+# Return to original directory in case marker installation changed it
+cd "$(dirname "$0")"
 
 # Optional: Copy bash history to zsh history if requested
 if [[ $1 == "--cp-hist" ]] || [[ $1 == "-c" ]]; then
@@ -179,6 +181,8 @@ if [[ $1 == "--cp-hist" ]] || [[ $1 == "-c" ]]; then
 else
     echo -e "\nNot copying bash_history to zsh_history, as --cp-hist or -c is not supplied\n"
 fi
+# Return to original directory in case previous operations changed it
+cd "$(dirname "$0")"
 
 # Directory for user configurations was already created earlier
 
@@ -194,4 +198,6 @@ if chsh -s $(which zsh) && /bin/zsh -i -c 'omz update'; then
 else
     echo -e "Something went wrong during the final setup"
 fi
+# Return to original directory before exiting
+cd "$(dirname "$0")"
 exit
