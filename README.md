@@ -1,60 +1,164 @@
-# ftazsh
-A simple script to setup an awesome shell environment.
-Quickly install and setup zsh and oh-my-zsh (https://github.com/robbyrussell/oh-my-zsh) with
-* powerlevel10k theme (https://github.com/romkatv/powerlevel10k)
-* Nerd-Fonts (https://github.com/ryanoasis/nerd-fonts)
-* zsh-completions (https://github.com/zsh-users/zsh-completions)
-* zsh-autosuggestions (https://github.com/zsh-users/zsh-autosuggestions)
-* zsh-syntax-highlighting (https://github.com/zsh-users/zsh-syntax-highlighting)
-* history-substring-search (https://github.com/zsh-users/zsh-history-substring-search)
-* fzf (https://github.com/junegunn/fzf)
-* k (https://github.com/supercrabtree/k)
-* marker (https://github.com/pindexis/marker)
-* todotxt (https://github.com/todotxt/todo.txt-cli)
+# ftazsh - Fast, Awesome ZSH Setup
 
-Sets following useful aliases and ohmyzsh plugins. **You can add more or overwrite these in your personal zsh config files under `~/.config/ftazsh/zshrc/`** 
-* l="ls -lah"         - just type "l" instead of "ls -lah"
-* alias k="k -h"	  - show human readable filesizes, in kb, mb etc
-* e="exit"
-* [x="extract"](https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/extract)         - extract any compressed files
-* [z](https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/z)   - quickly jump to most visited directories
-* [web-search](https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/web-search)    - search on the web from cli
-* [sudo](https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/sudo)                - easily prefix your commands with sudo by pressing `esc` twice
-* [systemd](https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/systemd)          - many useful aliases for systemd
-* https               - make httpie use https
-* myip - (wget -qO- https://wtfismyip.com/text)       - what's my ip: quickly find out external IP
-* cheat - (https://github.com/chubin/cheat.sh)        - cheatsheets in the terminal!
-* speedtest - (curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python3 -) run speedtest on the fly
-* dadjoke - (curl https://icanhazdadjoke.com)         - terminally sick jokes
-* dict - (curl "dict://dict.org/d:$1 $2 $3")          - dictionary definitions
-* ipgeo - (curl "http://api.db-ip.com/v2/free/$1")    - finds geo location from IP
-* corona - (curl "https://corona-stats.online/")      - shows corona virus spread live stats
+A comprehensive ZSH configuration framework that provides a beautiful, informative, and feature-rich terminal experience. ftazsh is designed to work perfectly on macOS and Linux systems with minimal setup.
 
+## What is ftazsh?
+
+ftazsh is a carefully curated collection of ZSH tools and configurations that transforms your terminal into a powerful development environment. It combines the best features of:
+
+* [Oh My Zsh](https://github.com/ohmyzsh/ohmyzsh) - A delightful community-driven framework for managing your Zsh configuration
+* [Powerlevel10k](https://github.com/romkatv/powerlevel10k) - A beautiful and informative ZSH theme
+* [Nerd Fonts](https://github.com/ryanoasis/nerd-fonts) - Iconic font aggregator, collection, and patcher
+* Various plugins and tools that enhance your terminal experience
+
+## Features
+
+ftazsh includes the following components:
+
+* **Powerlevel10k theme** - A fast, flexible, and powerful ZSH theme
+* **Nerd Fonts** - Fonts patched with icons for a beautiful terminal experience
+* **Useful plugins**:
+  * [zsh-completions](https://github.com/zsh-users/zsh-completions) - Additional completion definitions
+  * [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions) - Fish-like autosuggestions
+  * [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting) - Fish-like syntax highlighting
+  * [history-substring-search](https://github.com/zsh-users/zsh-history-substring-search) - Fish-like history search
+  * [fzf](https://github.com/junegunn/fzf) - A command-line fuzzy finder
+  * [k](https://github.com/supercrabtree/k) - Directory listings for ZSH with git features
+  * [marker](https://github.com/pindexis/marker) - Bookmark your shell commands
+
+* **Useful aliases and functions**:
+  * `l="ls --hyperlink=auto -lAhrtF"` - Enhanced list command (on macOS, hyperlink is automatically disabled)
+  * `a='eza -la --git --colour-scale all -g --smart-group --icons always'` - Better ls command (requires eza to be installed)
+  * `k="k -h"` - Show human-readable file sizes
+  * `e="exit"` - Quick exit
+  * `myip` - Quickly find out your external IP
+  * `cheat` - Access cheatsheets in the terminal
+  * `speedtest` - Run a network speed test
+  * `dadjoke` - Get a random dad joke
+  * `ipgeo` - Find geo location from an IP address
+
+## Directory Structure
+
+ftazsh uses the following directory structure:
+
+```
+~/.config/ftazsh/           # Main configuration directory
+├── oh-my-zsh/              # Oh My Zsh installation
+├── zshrc/                  # Your personal ZSH configurations (add files here)
+├── ftazshrc.zsh            # Main ftazsh configuration
+├── p10k.zsh                # Powerlevel10k configuration
+├── fzf/                    # Fuzzy finder
+└── marker/                 # Command bookmarker
+```
 
 ## Installation
-Requirements:
-* `git` to clone it.
-* `python3` or `python` is required to run option '-c' which copies history from .bash_history
 
-``` bash
+### Requirements
+
+* macOS or Linux
+* `git` to clone the repository
+* `zsh` (will be installed if not present)
+* `wget` (will be installed if not present)
+
+### macOS Installation
+
+```bash
+# Clone the repository
 git clone https://github.com/anxuanzi/ftazsh
 cd ftazsh
-./install.sh -c        # only run with '-c' the first time, running multiple times will duplicate history entries
+
+# Run the installation script
+./install.sh
+
+# Optional: Copy bash history to zsh history
+./install.sh -c
 ```
-This will install the setup under `~/.config/ftazsh/`
-Change your terminal's fonts to either "RobotoMono Nerd Font" or "Hack Nerd Font" or "DejaVu Sans Mono Nerd Fonts".
-You can also manually install Nerd Fonts of your choice.
+
+The script will:
+1. Install Homebrew if not already installed (on macOS)
+2. Install required packages (zsh, git, wget)
+3. Back up your existing .zshrc file
+4. Install Oh My Zsh and plugins
+5. Install Nerd Fonts
+6. Set up the ftazsh configuration
+
+After installation, restart your terminal or run `source ~/.zshrc` to apply the changes.
+
+### Fonts
+
+For the best experience, change your terminal's font to one of the installed Nerd Fonts:
+* "Hack Nerd Font"
+* "RobotoMono Nerd Font"
+* "DejaVu Sans Mono Nerd Font"
+
+### iTerm2 Users
+
+If you're using iTerm2 on macOS, you can import the included profile:
+1. Open iTerm2
+2. Go to Preferences > Profiles
+3. Click the "+" button to create a new profile
+4. Click "Other Actions..." > "Import JSON Profiles..."
+5. Select the `iterm2-profile.json` file from the ftazsh directory
+
+## Customization
+
+### Adding Your Own Configurations
+
+All personal configurations should be placed in the `~/.config/ftazsh/zshrc/` directory. You can create one or multiple files in this directory, and they will be automatically sourced when your shell starts.
+
+Example: Create a file `~/.config/ftazsh/zshrc/my_config.zsh` with your custom settings:
+
+```zsh
+# Add more plugins
+plugins+=(docker docker-compose)
+
+# Custom aliases
+alias dc="docker-compose"
+alias k8s="kubectl"
+
+# Custom functions
+function mkcd() {
+  mkdir -p "$1" && cd "$1"
+}
+```
+
+See the `example-config/personal_rc.zsh` file for more examples.
+
+### Customizing the Prompt
+
+The Powerlevel10k theme is highly customizable. You can run `p10k configure` to launch the configuration wizard, or edit `~/.config/ftazsh/p10k.zsh` directly.
+
+## Troubleshooting
+
+### Broken Icons or Fonts
+
+If icons or text appear broken in your terminal:
+1. Make sure you've installed the Nerd Fonts
+2. Set your terminal to use one of the Nerd Fonts (Hack, RobotoMono, or DejaVu Sans Mono)
+3. Ensure your terminal supports Unicode and has proper encoding settings
+
+### Command Not Found: eza
+
+The `a` and `aa` aliases use the `eza` command, which is not installed by default. To install it:
+
+```bash
+# On macOS
+brew install eza
+
+# On Linux
+sudo apt install eza  # Debian/Ubuntu
+sudo dnf install eza  # Fedora
+```
+
+Or remove/modify these aliases in your personal configuration.
 
 ## Notes
-* If you are already using zsh, your zsh config will be backed up to .zshrc-backup-date
 
-* If the text/icons look broken, make sure your terminal is using one of the Nerd fonts. [discussion](https://github.com/powerline/fonts/issues/185). I recommend "RobotoMono Nerd Font"
+* Your original .zshrc file is backed up to `.zshrc-backup-YYYY-MM-DD`
+* Marker's shortcut "Ctrl+t" is rebound to "Ctrl+b" to avoid conflicts with fzf
+* All Oh My Zsh plugins are installed under `~/.config/ftazsh/oh-my-zsh/plugins/`
+* Other tools (fzf, marker) are installed in `~/.config/ftazsh/`
 
-* marker's shortcut "Ctr+t" clashed with fzf so I rebound it to "Ctr +b"
+## Contributing
 
-* All oh-my-zsh plugins are installed under ~/.config/ftazsh/oh-my-zsh/plugin, Other tools (fzf,marker,todo) are installed in ~/.config/ftazsh/
-
-* The look of the shell can be very easily customised[https://github.com/bhilburn/powerlevel9k#prompt-customization] by overwriting POWERLEVEL10K settings
-in your personal config file under ~/.config/ftazsh/zshrc/ . See my setup under example/personal_rc.zsh
-
-Suggestions about more cool tools are always welcome :)
+Suggestions for more cool tools and improvements are always welcome! Feel free to open an issue or pull request.

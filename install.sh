@@ -1,12 +1,26 @@
 #!/bin/bash
 
 if command -v zsh &> /dev/null && command -v git &> /dev/null && command -v wget &> /dev/null; then
-    echo -e "ZSH and Git are already installed\n"
+    echo -e "ZSH, Git, and wget are already installed\n"
 else
-    if sudo apt install -y zsh git wget || sudo pacman -S zsh git wget || sudo dnf install -y zsh git wget || sudo yum install -y zsh git wget || sudo brew install git zsh wget || pkg install git zsh wget ; then
-        echo -e "zsh wget and git Installed\n"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS specific installation
+        if ! command -v brew &> /dev/null; then
+            echo "Homebrew is not installed. Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        fi
+        if brew install git zsh wget; then
+            echo -e "zsh, wget, and git installed with Homebrew\n"
+        else
+            echo -e "Failed to install packages with Homebrew\n" && exit
+        fi
     else
-        echo -e "Please install the following packages first, then try again: zsh git wget \n" && exit
+        # Linux specific installation
+        if sudo apt install -y zsh git wget || sudo pacman -S zsh git wget || sudo dnf install -y zsh git wget || sudo yum install -y zsh git wget || pkg install git zsh wget ; then
+            echo -e "zsh, wget, and git installed\n"
+        else
+            echo -e "Please install the following packages first, then try again: zsh git wget \n" && exit
+        fi
     fi
 fi
 
@@ -73,11 +87,21 @@ fi
 
 echo -e "Installing Nerd Fonts version of Hack, Roboto Mono, DejaVu Sans Mono\n"
 
-wget -q --show-progress -N https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/complete/Hack%20Regular%20Nerd%20Font%20Complete.ttf -P ~/.fonts/
-wget -q --show-progress -N https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/RobotoMono/Regular/complete/Roboto%20Mono%20Nerd%20Font%20Complete.ttf -P ~/.fonts/
-wget -q --show-progress -N https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/DejaVuSansMono/Regular/complete/DejaVu%20Sans%20Mono%20Nerd%20Font%20Complete.ttf -P ~/.fonts/
-
-fc-cache -fv ~/.fonts
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS font installation
+    mkdir -p ~/Library/Fonts
+    wget -q --show-progress -N https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/complete/Hack%20Regular%20Nerd%20Font%20Complete.ttf -P ~/Library/Fonts/
+    wget -q --show-progress -N https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/RobotoMono/Regular/complete/Roboto%20Mono%20Nerd%20Font%20Complete.ttf -P ~/Library/Fonts/
+    wget -q --show-progress -N https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/DejaVuSansMono/Regular/complete/DejaVu%20Sans%20Mono%20Nerd%20Font%20Complete.ttf -P ~/Library/Fonts/
+    # No need to run fc-cache on macOS as it automatically detects new fonts
+else
+    # Linux font installation
+    mkdir -p ~/.fonts
+    wget -q --show-progress -N https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/complete/Hack%20Regular%20Nerd%20Font%20Complete.ttf -P ~/.fonts/
+    wget -q --show-progress -N https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/RobotoMono/Regular/complete/Roboto%20Mono%20Nerd%20Font%20Complete.ttf -P ~/.fonts/
+    wget -q --show-progress -N https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/DejaVuSansMono/Regular/complete/DejaVu%20Sans%20Mono%20Nerd%20Font%20Complete.ttf -P ~/.fonts/
+    fc-cache -fv ~/.fonts
+fi
 
 if [ -d ~/.config/ftazsh/oh-my-zsh/custom/themes/powerlevel10k ]; then
     cd ~/.config/ftazsh/oh-my-zsh/custom/themes/powerlevel10k && git pull
@@ -85,7 +109,7 @@ else
     git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/.config/ftazsh/oh-my-zsh/custom/themes/powerlevel10k
 fi
 
-if [ -d ~/.~/.config/ftazsh/fzf ]; then
+if [ -d ~/.config/ftazsh/fzf ]; then
     cd ~/.config/ftazsh/fzf && git pull
     ~/.config/ftazsh/fzf/install --all --key-bindings --completion --no-update-rc
 else
@@ -128,10 +152,14 @@ else
     echo -e "\nNot copying bash_history to zsh_history, as --cp-hist or -c is not supplied\n"
 fi
 
-ZDOTDIR="~/.config/ftazsh/zshrc"
-if [ ! -d $ZDOTDIR ]; then
-    mkdir -p $ZDOTDIR
+# Create directory for user configurations if it doesn't exist
+if [ ! -d ~/.config/ftazsh/zshrc ]; then
+    mkdir -p ~/.config/ftazsh/zshrc
 fi
+
+# Set ZDOTDIR to point to the ftazsh config directory
+# This allows zsh to find configuration files in ~/.config/ftazsh
+echo 'export ZDOTDIR=~/.config/ftazsh' >> ~/.zshenv
 
 # source ~/.zshrc
 echo -e "\nSudo access is needed to change default shell\n"

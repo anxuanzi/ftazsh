@@ -141,12 +141,24 @@ SAVEHIST=50000      #save upto 50,000 lines in history. oh-my-zsh default is 10,
 #setopt hist_ignore_all_dups     # dont record duplicated entries in history during a single session
 
 alias myip="wget -qO- https://wtfismyip.com/text"	# quickly show external ip address
-alias l="ls --hyperlink=auto -lAhrtF"    # show all except . .. , sort by recent, / at the end of folders, clickable
+# OS-specific aliases
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS specific aliases
+    alias l="ls -lAhrtF"    # show all except . .. , sort by recent, / at the end of folders
+else
+    # Linux specific aliases
+    alias l="ls --hyperlink=auto -lAhrtF"    # show all except . .. , sort by recent, / at the end of folders, clickable
+    alias ip="ip --color=auto"
+fi
+
 alias e="exit"
-alias ip="ip --color=auto"
-## Install EZA to use this. The better ls command
-alias a='eza -la --git --colour-scale all -g --smart-group --icons always'  #the new ls; add --hyperlink if you like
-alias aa='eza -la --git --colour-scale all -g --smart-group --icons always -s modified -r'#sort by new
+
+## Install EZA to use these. The better ls command
+# To install eza: 
+# macOS: brew install eza
+# Linux: sudo apt install eza / sudo dnf install eza
+alias a='eza -la --git --colour-scale all -g --smart-group --icons always'  # The new ls; add --hyperlink if you like
+alias aa='eza -la --git --colour-scale all -g --smart-group --icons always -s modified -r' # Sort by newest
 
 
 # CUSTOM FUNCTIONS
@@ -157,7 +169,7 @@ alias aa='eza -la --git --colour-scale all -g --smart-group --icons always -s mo
 # eample: cheat python3 execute external program
 cheat() {
     if [ "$2" ]; then
-        curl "https://cheat.sh/$1/$2+$3+$4+$5+$6+$7+$8+$9+$10"
+        curl "https://cheat.sh/$1/$2+$3+$4+$5+$6+$7+$8+$9+${10}"
     else
         curl "https://cheat.sh/$1"
     fi
@@ -185,18 +197,28 @@ ipgeo() {
     fi
 }
 
-#POWERLEVEL9K_OS_ICON_BACKGROUND="white"
-#POWERLEVEL9K_OS_ICON_FOREGROUND="blue"
-#POWERLEVEL9K_DIR_HOME_FOREGROUND="white"
-#POWERLEVEL9K_DIR_HOME_SUBFOLDER_FOREGROUND="white"
-#POWERLEVEL9K_DIR_DEFAULT_FOREGROUND="white"
-#
-#POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status command_execution_time)
-#
-## more prompt elements that are suggested
-## (public_ip docker_machine pyenv nvm)          https://github.com/bhilburn/powerlevel9k#prompt-customization
-## Note: using public_ip is cool but when connection is down prompt waits for 10-20 seconds
-#
-#POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(ssh os_icon dir vcs)
-#
-#POWERLEVEL9K_PROMPT_ON_NEWLINE=false
+# Powerlevel10k configuration examples
+# Uncomment and modify these in your personal config file (~/.config/ftazsh/zshrc/my_config.zsh)
+
+# Colors and styles
+#typeset -g POWERLEVEL10K_OS_ICON_BACKGROUND="white"
+#typeset -g POWERLEVEL10K_OS_ICON_FOREGROUND="blue"
+#typeset -g POWERLEVEL10K_DIR_HOME_FOREGROUND="white"
+#typeset -g POWERLEVEL10K_DIR_HOME_SUBFOLDER_FOREGROUND="white"
+#typeset -g POWERLEVEL10K_DIR_DEFAULT_FOREGROUND="white"
+
+# Right prompt elements
+#typeset -g POWERLEVEL10K_RIGHT_PROMPT_ELEMENTS=(status command_execution_time)
+
+# Left prompt elements
+#typeset -g POWERLEVEL10K_LEFT_PROMPT_ELEMENTS=(ssh os_icon dir vcs)
+
+# More prompt elements that are suggested
+# (public_ip docker_machine pyenv nvm)
+# Note: using public_ip is cool but when connection is down prompt waits for 10-20 seconds
+
+# Single line prompt
+#typeset -g POWERLEVEL10K_PROMPT_ON_NEWLINE=false
+
+# For more customization options, run 'p10k configure' or see:
+# https://github.com/romkatv/powerlevel10k/blob/master/README.md
