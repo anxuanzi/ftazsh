@@ -61,7 +61,7 @@ cp -f p10k.zsh ~/.config/ftazsh/                                # Powerlevel10k 
 
 # Create directory for user-specific configurations
 mkdir -p ~/.config/ftazsh/zshrc                                 # User's personal ZSH configurations go here
-cp -f example-config/personal_rc.zsh ~/.config/ftazsh/zshrc/personal_rc.zsh  # Example configuration
+cp -f additional-config/personal_rc.zsh ~/.config/ftazsh/zshrc/personal_rc.zsh  # Example configuration
 
 # Create cache directory for ZSH completion files
 mkdir -p ~/.cache/zsh/                                          # Stores .zcompdump files to avoid cluttering $HOME
