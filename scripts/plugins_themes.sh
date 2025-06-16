@@ -7,7 +7,7 @@ source "$(dirname "$0")/utils.sh"
 # Install or update Oh My Zsh
 install_oh_my_zsh() {
     print_message "Installing oh-my-zsh\n"
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" --unattended
 }
 
 # Install or update Powerlevel10k theme
