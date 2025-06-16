@@ -72,7 +72,7 @@ plugins=(
     extract                 # Extract various archive formats
     z                       # Jump to frequently used directories
     sudo                    # Press ESC twice to add sudo to previous command
-    fzf-tab                 # Tab completion with fzf
+    # fzf-tab                 # Tab completion with fzf
     git                     # Git aliases and functions
     python                  # Python aliases and functions
     docker                  # Docker aliases and functions
