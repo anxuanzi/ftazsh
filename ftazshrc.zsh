@@ -10,26 +10,9 @@ export ZSH=$HOME/.config/ftazsh/oh-my-zsh
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
 
 
-POWERLEVEL9K_MODE='nerdfont-complete'
+#POWERLEVEL9K_MODE='nerdfont-complete'
 
 ZSH_THEME="powerlevel10k/powerlevel10k"
-
-POWERLEVEL9K_OS_ICON_BACKGROUND="white"
-POWERLEVEL9K_OS_ICON_FOREGROUND="blue"
-POWERLEVEL9K_DIR_HOME_FOREGROUND="white"
-POWERLEVEL9K_DIR_HOME_SUBFOLDER_FOREGROUND="white"
-POWERLEVEL9K_DIR_DEFAULT_FOREGROUND="white"
-
-POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status command_execution_time)
-
-# more prompt elements that are suggested
-# (public_ip docker_machine pyenv nvm)          https://github.com/bhilburn/powerlevel9k#prompt-customization
-# Note: using public_ip is cool but when connection is down prompt waits for 10-20 seconds
-
-POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(ssh os_icon dir vcs)
-
-POWERLEVEL9K_PROMPT_ON_NEWLINE=false
-
 
 # Uncomment the following line to use case-sensitive completion.
 # CASE_SENSITIVE="true"
@@ -74,30 +57,37 @@ POWERLEVEL9K_PROMPT_ON_NEWLINE=false
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
-    zsh-completions
-    zsh-autosuggestions
+    # zsh-completions   INSTALL METHOD CHANGED https://github.com/zsh-users/zsh-completions/issues/603
+    zsh-autosuggestions     # Disable if you are using Marker, otherwise enable
     zsh-syntax-highlighting
     history-substring-search
-    screen
     systemd
-    web-search
     k
     extract
     z
     sudo
+    fzf-tab
+    # web-search
     # httpie
-    # git
-    # python
+    git
+    python
     # docker
     # lol
-    # pip
+    pip
     # pyenv
     # redis-cli
     # zsh-wakatime          # enable if you use wakatime with 'https://github.com/wbingli/zsh-wakatime'
     )
+# Plugins can be added like into your own config file under ~/.config/ftazsh/zshrc/ like this:
 #plugins+=(zsh-nvm)
 
-# source $ZSH/oh-my-zsh.sh          # This is now run in .zshrc after importing user configs from ~/.config/ftazsh/zshrc/* files 
+# Remove plugins from the default list above in your own config file using:
+# plugins=(${plugins:#pluginname})
+# plugins=(${plugins:#zsh-autosuggestions})
+
+# fpath+="${ZSH_CUSTOM:-"$ZSH/custom"}/plugins/zsh-completions/src"   # install zsh-completions, if you need it
+
+# source $ZSH/oh-my-zsh.sh          # This is now run in .zshrc after importing user configs from ~/.config/ftazsh/zshrc/* files
 
 # User configuration
 
@@ -128,8 +118,11 @@ plugins=(
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
-# Add to PATH to Install and run programs with "pip install --user"
+# Add to PATH to run programs installed with pipx or "pip install --user"
 export PATH=$PATH:~/.local/bin
+
+# To give this path preference instead of system paths to run the latest version of tools, add the following to your personal config. Due to security concerns this is not done by default.
+# export PATH=~/.local/bin:$PATH
 
 export PATH=$PATH:~/.config/ftazsh/bin
 
@@ -138,7 +131,7 @@ PATH="$NPM_PACKAGES/bin:$PATH"
 
 [[ -s "$HOME/.config/ftazsh/marker/marker.sh" ]] && source "$HOME/.config/ftazsh/marker/marker.sh"
 
-autoload -U compinit && compinit -C -d ~/.cache/zsh/.zcompdump        # zsh-completions
+# autoload -U compinit && compinit -C -d ~/.cache/zsh/.zcompdump        # zsh-completions
 # autoload bashcompinit                 # bash completions
 # bashcompinit
 
@@ -148,8 +141,12 @@ SAVEHIST=50000      #save upto 50,000 lines in history. oh-my-zsh default is 10,
 #setopt hist_ignore_all_dups     # dont record duplicated entries in history during a single session
 
 alias myip="wget -qO- https://wtfismyip.com/text"	# quickly show external ip address
-alias l="ls -lah"
+alias l="ls --hyperlink=auto -lAhrtF"    # show all except . .. , sort by recent, / at the end of folders, clickable
 alias e="exit"
+alias ip="ip --color=auto"
+## Install EZA to use this. The better ls command
+alias a='eza -la --git --colour-scale all -g --smart-group --icons always'  #the new ls; add --hyperlink if you like
+alias aa='eza -la --git --colour-scale all -g --smart-group --icons always -s modified -r'#sort by new
 
 
 # CUSTOM FUNCTIONS
@@ -166,7 +163,6 @@ cheat() {
     fi
 }
 
-
 # Matrix screen saver! will run if you have installed "cmatrix"
 # TMOUT=900
 # TRAPALRM() { if command -v cmatrix &> /dev/null; then cmatrix -sb; fi }
@@ -179,17 +175,6 @@ dadjoke() {
     curl https://icanhazdadjoke.com
 }
 
-# Find dictionary definition
-dict() {
-    if [ "$3" ]; then
-        curl "dict://dict.org/d:$1 $2 $3"
-    elif [ "$2" ]; then
-        curl "dict://dict.org/d:$1 $2"
-    else
-        curl "dict://dict.org/d:$1"
-    fi
-}
-
 # Find geo info from IP
 ipgeo() {
     # Specify ip or your ip will be used
@@ -200,12 +185,18 @@ ipgeo() {
     fi
 }
 
-# Show covid-19 spread stats
-corona() {
-    # Specify country otherwise shows stats for all
-    if [ "$1" ]; then
-        curl "https://corona-stats.online/$1"
-    else
-        curl "https://corona-stats.online"
-    fi
-}
+#POWERLEVEL9K_OS_ICON_BACKGROUND="white"
+#POWERLEVEL9K_OS_ICON_FOREGROUND="blue"
+#POWERLEVEL9K_DIR_HOME_FOREGROUND="white"
+#POWERLEVEL9K_DIR_HOME_SUBFOLDER_FOREGROUND="white"
+#POWERLEVEL9K_DIR_DEFAULT_FOREGROUND="white"
+#
+#POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status command_execution_time)
+#
+## more prompt elements that are suggested
+## (public_ip docker_machine pyenv nvm)          https://github.com/bhilburn/powerlevel9k#prompt-customization
+## Note: using public_ip is cool but when connection is down prompt waits for 10-20 seconds
+#
+#POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(ssh os_icon dir vcs)
+#
+#POWERLEVEL9K_PROMPT_ON_NEWLINE=false

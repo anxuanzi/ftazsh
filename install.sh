@@ -1,5 +1,15 @@
 #!/bin/bash
 
+if command -v zsh &> /dev/null && command -v git &> /dev/null && command -v wget &> /dev/null; then
+    echo -e "ZSH and Git are already installed\n"
+else
+    if sudo apt install -y zsh git wget || sudo pacman -S zsh git wget || sudo dnf install -y zsh git wget || sudo yum install -y zsh git wget || sudo brew install git zsh wget || pkg install git zsh wget ; then
+        echo -e "zsh wget and git Installed\n"
+    else
+        echo -e "Please install the following packages first, then try again: zsh git wget \n" && exit
+    fi
+fi
+
 if mv -n ~/.zshrc ~/.zshrc-backup-$(date +"%Y-%m-%d"); then # backup .zshrc
     echo -e "Backed up the current .zshrc to .zshrc-backup-date\n"
 fi
@@ -7,7 +17,7 @@ fi
 mkdir -p ~/.config/ftazsh       # the setup will be installed in here
 
 if [ -d ~/.quickzsh ]; then
-    echo -e "\n PREVIOUS SETUP FOUND AT '~/.quickzsh'. PLEASE MANUALLY MOVE ANY FILES YOU'D LIKE TO '~/.config/ezsh' \n"
+    echo -e "\n PREVIOUS SETUP FOUND AT '~/.quickzsh'. PLEASE MANUALLY MOVE ANY FILES YOU'D LIKE TO '~/.config/ftazsh' \n"
 fi
 
 echo -e "Installing oh-my-zsh\n"
@@ -98,25 +108,6 @@ if ~/.config/ftazsh/marker/install.py; then
     echo -e "Installed Marker\n"
 else
     echo -e "Marker Installation Had Issues\n"
-fi
-
-# if git clone --depth 1 https://github.com/todotxt/todo.txt-cli.git ~/.config/ftazsh/todo; then :
-# else
-#     cd ~/.config/ftazsh/todo && git fetch --all && git reset --hard origin/master
-# fi
-# mkdir ~/.config/ftazsh/todo/bin ; cp -f ~/.config/ftazsh/todo/todo.sh ~/.config/ftazsh/todo/bin/todo.sh # cp todo.sh to ./bin so only it is included in $PATH
-# #touch ~/.todo/config     # needs it, otherwise spits error , yeah a bug in todo
-# ln -s ~/.config/ftazsh/todo ~/.todo
-if [ ! -L ~/.config/ftazsh/todo/bin/todo.sh ]; then
-    echo -e "Installing todo.sh in ~/.config/ftazsh/todo\n"
-    mkdir -p ~/.config/ftazsh/bin
-    mkdir -p ~/.config/ftazsh/todo
-    wget -q --show-progress "https://github.com/todotxt/todo.txt-cli/releases/download/v2.12.0/todo.txt_cli-2.12.0.tar.gz" -P ~/.config/ftazsh/
-    tar xvf ~/.config/ftazsh/todo.txt_cli-2.12.0.tar.gz -C ~/.config/ftazsh/todo --strip 1 && rm ~/.config/ftazsh/todo.txt_cli-2.12.0.tar.gz
-    ln -s -f ~/.config/ftazsh/todo/todo.sh ~/.config/ftazsh/bin/todo.sh     # so only .../bin is included in $PATH
-    ln -s -f ~/.config/ftazsh/todo/todo.cfg ~/.todo.cfg     # it expects it there or ~/todo.cfg or ~/.todo/config
-else
-    echo -e "todo.sh is already instlled in ~/.config/ftazsh/todo/bin/\n"
 fi
 
 if [[ $1 == "--cp-hist" ]] || [[ $1 == "-c" ]]; then
