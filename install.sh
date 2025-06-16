@@ -54,8 +54,15 @@ else
                 fi
             fi
         fi
-        if brew install git zsh wget; then
-            print_success "zsh, wget, and git installed with Homebrew\n"
+        # On macOS, use system zsh (/bin/zsh) instead of Homebrew zsh
+        if brew install git wget; then
+            print_success "git and wget installed with Homebrew\n"
+            # Check if system zsh exists
+            if [ -f /bin/zsh ]; then
+                print_success "Using system zsh (/bin/zsh)\n"
+            else
+                print_error "System zsh (/bin/zsh) not found. Please ensure zsh is installed.\n" && exit
+            fi
         else
             print_error "Failed to install packages with Homebrew\n" && exit
         fi
@@ -252,17 +259,22 @@ print_message "\nSudo access is needed to change default shell\n"
 
 # Function to change the default shell to ZSH
 change_default_shell() {
-    # 1. Locate the Homebrew Zsh executable.
+    # 1. Determine the Zsh path based on OS
     local zsh_path
-    if ! zsh_path=$(which zsh); then
-        print_error "Zsh not found in your PATH. Please install Zsh first (e.g., 'brew install zsh')."
-        exit 1
-    fi
 
-    # Check if it's the Homebrew path.
-    if [[ "$zsh_path" != "/opt/homebrew/bin/zsh" ]] && [[ "$zsh_path" != "/usr/local/bin/zsh" ]]; then
-        print_message "The detected Zsh is at '$zsh_path', which doesn't seem to be a Homebrew installation."
-        print_message "The script will proceed, but this is intended for Homebrew-managed shells."
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # On macOS, use the system zsh
+        zsh_path="/bin/zsh"
+        if [ ! -f "$zsh_path" ]; then
+            print_error "System Zsh not found at '$zsh_path'. Please ensure zsh is installed."
+            exit 1
+        fi
+    else
+        # On other systems, use zsh from PATH
+        if ! zsh_path=$(which zsh); then
+            print_error "Zsh not found in your PATH. Please install Zsh first."
+            exit 1
+        fi
     fi
 
     print_message "Zsh is located at: $zsh_path"

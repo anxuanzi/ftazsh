@@ -39,5 +39,3 @@ source $ZSH/oh-my-zsh.sh
 # Now source fzf.zsh , otherwise Ctr+r is overwritten by ohmyzsh
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 export FZF_DEFAULT_OPS="--extended"
-
-alias k="k -h"       # show human readable file sizes, in kb, mb etc

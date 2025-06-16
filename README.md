@@ -57,7 +57,7 @@ ftazsh uses the following directory structure:
 
 * macOS or Linux
 * `git` to clone the repository
-* `zsh` (will be installed if not present)
+* `zsh` (on macOS, the system zsh at /bin/zsh will be used; on Linux, it will be installed if not present)
 * `wget` (will be installed if not present)
 
 ### macOS Installation
@@ -77,11 +77,12 @@ cd ftazsh
 The script will:
 1. Install Homebrew if not already installed (on macOS)
 2. Configure Homebrew in your .zprofile file (on macOS)
-3. Install required packages (zsh, git, wget)
-4. Back up your existing .zshrc file
-5. Install Oh My Zsh and plugins
-6. Install Nerd Fonts
-7. Set up the ftazsh configuration
+3. Use the system zsh (/bin/zsh) on macOS
+4. Install required packages (git, wget) via Homebrew on macOS
+5. Back up your existing .zshrc file
+6. Install Oh My Zsh and plugins
+7. Install Nerd Fonts
+8. Set up the ftazsh configuration
 
 After installation, restart your terminal or run `source ~/.zshrc` to apply the changes.
 
