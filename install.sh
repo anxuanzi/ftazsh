@@ -217,7 +217,17 @@ create_directories() {
 # Install or update Oh My Zsh
 install_oh_my_zsh() {
     print_message "Installing oh-my-zsh\n"
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" --unattended --skip-chsh --keep-zshrc
+    if [ -d ~/.config/ftazsh/oh-my-zsh ]; then
+        print_message "oh-my-zsh is already installed\n"
+        git -C ~/.config/ftazsh/oh-my-zsh remote set-url origin https://github.com/ohmyzsh/ohmyzsh.git
+    elif [ -d ~/.oh-my-zsh ]; then
+        print_message "oh-my-zsh in already installed at '~/.oh-my-zsh'. Moving it to '~/.config/ftazsh/oh-my-zsh'"
+        export ZSH="$HOME/.config/ftazsh/oh-my-zsh"
+        mv ~/.oh-my-zsh ~/.config/ftazsh/oh-my-zsh
+        git -C ~/.config/ftazsh/oh-my-zsh remote set-url origin https://github.com/ohmyzsh/ohmyzsh.git
+    else
+        git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git ~/.config/ftazsh/oh-my-zsh
+    fi
 }
 
 # Install or update Powerlevel10k theme
