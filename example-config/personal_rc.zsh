@@ -4,7 +4,7 @@
 
 # ===== PLUGINS =====
 # Add additional Oh My Zsh plugins
-plugins+=(docker docker-compose git-flow)
+#plugins+=(docker docker-compose git-flow)
 
 # Remove plugins from the default list if needed
 # plugins=(${plugins:#zsh-autosuggestions})

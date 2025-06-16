@@ -71,7 +71,7 @@ plugins=(
     # httpie
     git
     python
-    # docker
+    docker
     # lol
     pip
     # pyenv
