@@ -163,6 +163,8 @@ change_default_shell() {
         return 1
     fi
 
+    source ~/.zshrc
+
     # 5. Update Oh My Zsh if it exists.
     # Check if the OMZ directory exists before trying to update.
     print_message "Updating Oh My Zsh..."
