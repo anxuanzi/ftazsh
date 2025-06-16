@@ -62,13 +62,10 @@ plugins=(
     zsh-syntax-highlighting
     history-substring-search
     systemd
-    k
     extract
     z
     sudo
     fzf-tab
-    # web-search
-    # httpie
     git
     python
     docker
