@@ -2,6 +2,11 @@
 # ftazsh installation script
 # This script installs and configures a comprehensive ZSH setup with Oh My Zsh,
 # Powerlevel10k theme, Nerd Fonts, and various useful plugins.
+#
+# Usage: ./install.sh [OPTIONS]
+#
+# Options:
+#   --cp-hist, -c    Copy bash_history to zsh_history
 
 print_message() {
     echo -e "🔵  $1"
@@ -229,48 +234,53 @@ echo 'export ZDOTDIR=~/.config/ftazsh' >> ~/.zshenv
 # Final steps: Change default shell to ZSH and update Oh My Zsh
 print_message "\nSudo access is needed to change default shell\n"
 
-
-# 1. Locate the Homebrew Zsh executable.
-local zsh_path
-if ! zsh_path=$(which zsh); then
-    print_error "Zsh not found in your PATH. Please install Zsh first (e.g., 'brew install zsh')."
-    exit 1
-fi
-
-# Check if it's the Homebrew path.
-if [[ "$zsh_path" != "/opt/homebrew/bin/zsh" ]] && [[ "$zsh_path" != "/usr/local/bin/zsh" ]]; then
-    print_message "The detected Zsh is at '$zsh_path', which doesn't seem to be a Homebrew installation."
-    print_message "The script will proceed, but this is intended for Homebrew-managed shells."
-fi
-
-print_message "Zsh is located at: $zsh_path"
-
-# 2. Check if the Zsh path is in /etc/shells.
-local shells_file="/etc/shells"
-if ! grep -q "^${zsh_path}$" "$shells_file"; then
-    print_message "'$zsh_path' is not listed in $shells_file."
-    print_message "We need to add it. This requires administrator privileges."
-
-    # 3. Add the Zsh path to /etc/shells using sudo.
-    # The 'tee' command is used to append to a file requiring root privileges.
-    if echo "$zsh_path" | sudo tee -a "$shells_file" > /dev/null; then
-        print_success "Successfully added '$zsh_path' to $shells_file."
-    else
-        print_error "Failed to add '$zsh_path' to $shells_file. Please check your permissions."
+# Function to change the default shell to ZSH
+change_default_shell() {
+    # 1. Locate the Homebrew Zsh executable.
+    local zsh_path
+    if ! zsh_path=$(which zsh); then
+        print_error "Zsh not found in your PATH. Please install Zsh first (e.g., 'brew install zsh')."
         exit 1
     fi
-else
-    print_success "'$zsh_path' is already in $shells_file."
-fi
 
-# 4. Change the shell.
-print_message "Attempting to change the default shell to '$zsh_path'..."
-if chsh -s "$zsh_path"; then
-    print_success "Default shell changed successfully."
-else
-    print_error "Failed to change the shell with 'chsh'. Please try running 'chsh -s $zsh_path' manually."
-    exit 1
-fi
+    # Check if it's the Homebrew path.
+    if [[ "$zsh_path" != "/opt/homebrew/bin/zsh" ]] && [[ "$zsh_path" != "/usr/local/bin/zsh" ]]; then
+        print_message "The detected Zsh is at '$zsh_path', which doesn't seem to be a Homebrew installation."
+        print_message "The script will proceed, but this is intended for Homebrew-managed shells."
+    fi
+
+    print_message "Zsh is located at: $zsh_path"
+
+    # 2. Check if the Zsh path is in /etc/shells.
+    local shells_file="/etc/shells"
+    if ! grep -q "^${zsh_path}$" "$shells_file"; then
+        print_message "'$zsh_path' is not listed in $shells_file."
+        print_message "We need to add it. This requires administrator privileges."
+
+        # 3. Add the Zsh path to /etc/shells using sudo.
+        # The 'tee' command is used to append to a file requiring root privileges.
+        if echo "$zsh_path" | sudo tee -a "$shells_file" > /dev/null; then
+            print_success "Successfully added '$zsh_path' to $shells_file."
+        else
+            print_error "Failed to add '$zsh_path' to $shells_file. Please check your permissions."
+            exit 1
+        fi
+    else
+        print_success "'$zsh_path' is already in $shells_file."
+    fi
+
+    # 4. Change the shell.
+    print_message "Attempting to change the default shell to '$zsh_path'..."
+    if chsh -s "$zsh_path"; then
+        print_success "Default shell changed successfully."
+    else
+        print_error "Failed to change the shell with 'chsh'. Please try running 'chsh -s $zsh_path' manually."
+        exit 1
+    fi
+}
+
+# Call the function to change the default shell
+change_default_shell
 
 
 # 5. Update Oh My Zsh if it exists.
