@@ -52,6 +52,7 @@ cp -f ftazshrc.zsh ~/.config/ftazsh/
 cp -f p10k.zsh ~/.config/ftazsh/
 
 mkdir -p ~/.config/ftazsh/zshrc         # PLACE YOUR ZSHRC CONFIGURATIONS OVER THERE
+cp -f example-config/personal_rc.zsh ~/.config/ftazsh/zshrc/personal_rc.zsh
 mkdir -p ~/.cache/zsh/                # this will be used to store .zcompdump zsh completion cache files which normally clutter $HOME
 
 if [ -f ~/.zcompdump ]; then
