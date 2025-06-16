@@ -293,23 +293,21 @@ change_default_shell() {
         print_error "Failed to change the shell with 'chsh'. Please try running 'chsh -s $zsh_path' manually."
         exit 1
     fi
+
+    # 5. Update Oh My Zsh if it exists.
+    # Check if the OMZ directory exists before trying to update.
+    print_message "Updating Oh My Zsh..."
+    # We run this in a subshell to avoid issues with the current script's environment.
+    if $zsh_path -i -c 'omz update'; then
+        print_success "Oh My Zsh update completed."
+    else
+        # A failed update is not critical, so we'll just warn the user.
+        print_error "Oh My Zsh update command finished with a non-zero status. Check the output above."
+    fi
 }
 
 # Call the function to change the default shell
 change_default_shell
-
-
-# 5. Update Oh My Zsh if it exists.
-# Check if the OMZ directory exists before trying to update.
-
-print_message "Updating Oh My Zsh..."
-# We run this in a subshell to avoid issues with the current script's environment.
-if /bin/zsh -i -c 'omz update'; then
-    print_success "Oh My Zsh update completed."
-else
-    # A failed update is not critical, so we'll just warn the user.
-    print_error "Oh My Zsh update command finished with a non-zero status. Check the output above."
-fi
 
 echo ""
 print_success "🎉 Installation successful!"
