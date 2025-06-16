@@ -30,7 +30,7 @@
   [[ $ZSH_VERSION == (5.<1->*|<6->.*) ]] || return
 
   # Use two line prompt
-  POWERLEVEL9K_PROMPT_ON_NEWLINE=true
+  POWERLEVEL9K_PROMPT_ON_NEWLINE=false
 
   # The list of segments shown on the left. Fill it with the most important segments.
   typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(
