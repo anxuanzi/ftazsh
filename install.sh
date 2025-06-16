@@ -12,6 +12,30 @@ else
         if ! command -v brew &> /dev/null; then
             echo "Homebrew is not installed. Installing Homebrew..."
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+            # Configure Homebrew in the user's profile
+            echo "Configuring Homebrew in user's profile..."
+            echo >> "$HOME/.zprofile"
+
+            # Detect Homebrew location based on architecture
+            if [[ -f /opt/homebrew/bin/brew ]]; then
+                # Apple Silicon Mac
+                echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> "$HOME/.zprofile"
+                eval "$(/opt/homebrew/bin/brew shellenv)"
+            elif [[ -f /usr/local/bin/brew ]]; then
+                # Intel Mac
+                echo 'eval "$(/usr/local/bin/brew shellenv)"' >> "$HOME/.zprofile"
+                eval "$(/usr/local/bin/brew shellenv)"
+            else
+                # Try to find brew in PATH as fallback
+                BREW_PATH=$(which brew)
+                if [[ -n "$BREW_PATH" ]]; then
+                    echo "eval \"\$(${BREW_PATH} shellenv)\"" >> "$HOME/.zprofile"
+                    eval "$(${BREW_PATH} shellenv)"
+                else
+                    echo "Warning: Could not determine Homebrew location"
+                fi
+            fi
         fi
         if brew install git zsh wget; then
             echo -e "zsh, wget, and git installed with Homebrew\n"

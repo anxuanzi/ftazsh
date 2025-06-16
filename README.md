@@ -76,11 +76,12 @@ cd ftazsh
 
 The script will:
 1. Install Homebrew if not already installed (on macOS)
-2. Install required packages (zsh, git, wget)
-3. Back up your existing .zshrc file
-4. Install Oh My Zsh and plugins
-5. Install Nerd Fonts
-6. Set up the ftazsh configuration
+2. Configure Homebrew in your .zprofile file (on macOS)
+3. Install required packages (zsh, git, wget)
+4. Back up your existing .zshrc file
+5. Install Oh My Zsh and plugins
+6. Install Nerd Fonts
+7. Set up the ftazsh configuration
 
 After installation, restart your terminal or run `source ~/.zshrc` to apply the changes.
 
