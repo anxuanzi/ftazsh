@@ -163,7 +163,7 @@ change_default_shell() {
         return 1
     fi
 
-    source ~/.zshrc
+    print_message "Default shell will be used in new terminal sessions."
 
     # 5. Update Oh My Zsh if it exists.
     # Check if the OMZ directory exists before trying to update.
