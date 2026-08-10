@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  linux:
+    name: Lint + unit + integration (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            zsh shellcheck bats fzf zoxide eza
+
+      - name: Lint (shellcheck + zsh -n)
+        run: make lint
+
+      - name: Unit tests (bats)
+        run: make unit
+
+      - name: Integration test (real zsh boot)
+        run: make integration
+
+  macos:
+    name: Real install (macOS)
+    runs-on: macos-latest
+    env:
+      # Keep prompt boot hermetic on a headless runner.
+      POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD: "true"
+      POWERLEVEL9K_INSTANT_PROMPT: "off"
+      POWERLEVEL9K_DISABLE_GITSTATUS: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run installer end to end (unattended)
+        run: ./install.sh --unattended
+
+      - name: Modern tools are on PATH
+        run: |
+          failed=0
+          for t in eza bat fd rg fzf zoxide jq; do
+            if command -v "$t"; then :; else echo "missing: $t"; failed=1; fi
+          done
+          exit "$failed"
+
+      - name: Managed .zshrc is installed
+        run: grep -q "ftazsh-managed" "$HOME/.zshrc"
+
+      - name: Interactive zsh boots with no stderr output
+        run: |
+          err="$(zsh -i -c exit 2>&1 >/dev/null)"
+          if [ -n "$err" ]; then
+            echo "stderr during boot:"
+            printf '%s\n' "$err"
+            exit 1
+          fi
+
+      - name: fzf and zoxide integrations are active
+        run: |
+          zsh -i -c 'whence fzf-history-widget >/dev/null'
+          zsh -i -c 'whence __zoxide_z >/dev/null'
+          zsh -i -c '[[ -n "$FZF_DEFAULT_OPTS" ]]'
+
+      - name: Re-run installer (idempotency)
+        run: ./install.sh --unattended
