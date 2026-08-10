@@ -124,6 +124,19 @@ setup() {
     [ ! -d "$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions" ]
 }
 
+@test "install_p10k clones the theme into custom/themes and re-runs cleanly" {
+    make_fixture_repo "$BATS_TEST_TMPDIR/fixtures" ohmyzsh
+    make_fixture_repo "$BATS_TEST_TMPDIR/fixtures" powerlevel10k
+    export FTAZSH_OMZ_REPO="file://$BATS_TEST_TMPDIR/fixtures/ohmyzsh"
+    export FTAZSH_P10K_REPO="file://$BATS_TEST_TMPDIR/fixtures/powerlevel10k"
+    create_directories
+    install_omz
+    install_p10k
+    [ -d "$FTAZSH_HOME/oh-my-zsh/custom/themes/powerlevel10k/.git" ]
+    run install_p10k
+    [ "$status" -eq 0 ]
+}
+
 # ---------- config file installation ----------
 
 @test "copy_config_files installs managed .zshrc and config set" {

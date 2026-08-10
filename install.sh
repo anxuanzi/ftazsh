@@ -30,6 +30,7 @@ CASKS=(font-jetbrains-mono-nerd-font font-hack-nerd-font)
 
 # Repo sources — overridable so tests can point at local fixtures.
 OMZ_REPO="${FTAZSH_OMZ_REPO:-https://github.com/ohmyzsh/ohmyzsh.git}"
+P10K_REPO="${FTAZSH_P10K_REPO:-https://github.com/romkatv/powerlevel10k.git}"
 PLUGIN_BASE_URL="${FTAZSH_PLUGIN_BASE_URL:-https://github.com/zsh-users}"
 PLUGINS=(zsh-autosuggestions zsh-syntax-highlighting zsh-completions)
 
@@ -241,6 +242,19 @@ install_plugin_repos() {
     ok "zsh plugins ready"
 }
 
+install_p10k() {
+    local dest="$FTAZSH_HOME/oh-my-zsh/custom/themes/powerlevel10k"
+    if [[ -d "$dest/.git" ]]; then
+        info "Updating Powerlevel10k..."
+        git -C "$dest" pull --ff-only --quiet \
+            || warn "Powerlevel10k update skipped (offline or local changes)."
+    else
+        info "Installing Powerlevel10k theme..."
+        git clone --depth=1 --quiet "$P10K_REPO" "$dest"
+        ok "Powerlevel10k installed"
+    fi
+}
+
 copy_config_files() {
     info "Installing configuration files..."
     cp -f "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"
@@ -322,6 +336,7 @@ main() {
     create_directories
     install_omz
     install_plugin_repos
+    install_p10k
     copy_config_files
     ensure_default_shell
     print_summary
