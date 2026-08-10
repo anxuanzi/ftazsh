@@ -1,0 +1,2 @@
+# Sourced files (oh-my-zsh internals, install.sh in tests) are not followed.
+disable=SC1091

@@ -1,482 +1,383 @@
 #!/bin/bash
-# ftazsh installation script
-# This script installs and configures a comprehensive ZSH setup with Oh My Zsh,
-# Powerlevel10k theme, Nerd Fonts, and various useful plugins.
+# ftazsh installer — a modern zsh environment for macOS.
 #
-# Usage: ./install_new.sh [OPTIONS]
+# Installs Homebrew (if missing), a curated set of modern CLI tools,
+# Nerd Fonts, oh-my-zsh + Powerlevel10k + plugins, and the ftazsh
+# configuration under ~/.config/ftazsh.
 #
-# Options:
-#   --cp-hist, -c    Copy bash_history to zsh_history
+# Safe to re-run: every step is idempotent, and nothing in your personal
+# config directory (~/.config/ftazsh/zshrc/) is ever overwritten.
+#
+# Usage: ./install.sh [OPTIONS]
+#   -h, --help        Show this help
+#       --unattended  Non-interactive mode: never prompts, skips changing
+#                     the login shell (prints the command instead). For CI.
+#
+# Compatible with the stock macOS bash 3.2.
 
-# Determine the script's directory
+set -euo pipefail
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FTAZSH_HOME="${FTAZSH_HOME:-$HOME/.config/ftazsh}"
+ZSH_TARGET="/bin/zsh"
+UNATTENDED=0
+
+# Modern unix tools installed with Homebrew and wired up in tools.zsh.
+FORMULAE=(git eza bat fd ripgrep fzf zoxide jq)
+# Nerd Fonts (v3 naming). JetBrains Mono is used by the bundled iTerm2 profile.
+JBM_CASK="font-jetbrains-mono-nerd-font"
+CASKS=("$JBM_CASK" font-hack-nerd-font)
+JBM_FONT_URL_DEFAULT="https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"
+
+# Default sources. Each is overridable at call time via FTAZSH_* environment
+# variables (tests point them at local fixtures; see the *_url/file helpers).
+OMZ_REPO_DEFAULT="https://github.com/ohmyzsh/ohmyzsh.git"
+P10K_REPO_DEFAULT="https://github.com/romkatv/powerlevel10k.git"
+PLUGIN_BASE_URL_DEFAULT="https://github.com/zsh-users"
+PLUGINS=(zsh-autosuggestions zsh-syntax-highlighting zsh-completions)
 
 #######################################
-# UTILITY FUNCTIONS
+# Output helpers
 #######################################
 
-# Print a regular message
-print_message() {
-    echo -e "🔵  $1"
+info() { printf '🔵  %s\n' "$*"; }
+ok()   { printf '✅  %s\n' "$*"; }
+warn() { printf '⚠️   %s\n' "$*" >&2; }
+err()  { printf '❌  %s\n' "$*" >&2; }
+
+# Overridable sources, resolved when used (not when this file is sourced),
+# so tests can export FTAZSH_* after sourcing.
+omz_repo()        { printf '%s' "${FTAZSH_OMZ_REPO:-$OMZ_REPO_DEFAULT}"; }
+p10k_repo()       { printf '%s' "${FTAZSH_P10K_REPO:-$P10K_REPO_DEFAULT}"; }
+plugin_base_url() { printf '%s' "${FTAZSH_PLUGIN_BASE_URL:-$PLUGIN_BASE_URL_DEFAULT}"; }
+jbm_font_url()    { printf '%s' "${FTAZSH_JBM_FONT_URL:-$JBM_FONT_URL_DEFAULT}"; }
+font_dir()        { printf '%s' "${FTAZSH_FONT_DIR:-$HOME/Library/Fonts}"; }
+shells_file()     { printf '%s' "${FTAZSH_SHELLS_FILE:-/etc/shells}"; }
+
+usage() {
+    cat <<'EOF'
+Usage: ./install.sh [OPTIONS]
+
+Installs the ftazsh zsh environment on macOS.
+
+Options:
+  -h, --help        Show this help and exit
+      --unattended  Non-interactive mode: never prompts, skips changing
+                    the login shell (prints the command instead). For CI.
+EOF
 }
 
-# Print a success message
-print_success() {
-    echo -e "✅  $1"
-}
-
-# Print an error message
-print_error() {
-    echo -e "❌  $1" >&2
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            --unattended)
+                UNATTENDED=1
+                ;;
+            *)
+                usage >&2
+                err "Unknown option: $1"
+                exit 2
+                ;;
+        esac
+        shift
+    done
 }
 
 #######################################
-# DEPENDENCY INSTALLATION FUNCTIONS
+# Preconditions
 #######################################
 
-# Install dependencies based on the operating system
-install_dependencies() {
-    # Check if required dependencies are already installed
-    if command -v zsh &> /dev/null && command -v git &> /dev/null && command -v wget &> /dev/null; then
-        print_success "ZSH, Git, and wget are already installed\n"
+require_macos() {
+    local os
+    os="$(uname -s)"
+    if [[ "$os" != "Darwin" ]]; then
+        err "ftazsh supports macOS only (detected: $os)."
+        return 1
+    fi
+}
+
+#######################################
+# Homebrew: package manager, tools, fonts
+#######################################
+
+ensure_homebrew() {
+    if command -v brew >/dev/null 2>&1; then
+        ok "Homebrew already installed"
         return 0
     fi
 
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS specific installation
-        install_macos_dependencies
+    info "Installing Homebrew (may ask for your password)..."
+    if [[ "$UNATTENDED" -eq 1 ]]; then
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     else
-        # Linux specific installation
-        install_linux_dependencies
-    fi
-}
-
-# Install dependencies on macOS
-install_macos_dependencies() {
-    if ! command -v brew &> /dev/null; then
-        print_message "Homebrew is not installed. Installing Homebrew..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-        # Configure Homebrew in the user's profile
-        print_message "Configuring Homebrew in user's profile..."
-        echo >> "$HOME/.zprofile"
-
-        # Detect Homebrew location based on architecture
-        if [[ -f /opt/homebrew/bin/brew ]]; then
-            # Apple Silicon Mac
-            echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> "$HOME/.zprofile"
-            eval "$(/opt/homebrew/bin/brew shellenv)"
-        elif [[ -f /usr/local/bin/brew ]]; then
-            # Intel Mac
-            echo 'eval "$(/usr/local/bin/brew shellenv)"' >> "$HOME/.zprofile"
-            eval "$(/usr/local/bin/brew shellenv)"
-        else
-            # Try to find brew in PATH as fallback
-            BREW_PATH=$(which brew)
-            if [[ -n "$BREW_PATH" ]]; then
-                echo "eval \"\$(${BREW_PATH} shellenv)\"" >> "$HOME/.zprofile"
-                eval "$(${BREW_PATH} shellenv)"
-            else
-                print_error "Warning: Could not determine Homebrew location"
-            fi
-        fi
     fi
-    
-    # On macOS, use system zsh (/bin/zsh) instead of Homebrew zsh
-    if brew install git wget; then
-        print_success "git and wget installed with Homebrew\n"
-        # Check if system zsh exists
-        if [ -f /bin/zsh ]; then
-            print_success "Using system zsh (/bin/zsh)\n"
-            return 0
-        else
-            print_error "System zsh (/bin/zsh) not found. Please ensure zsh is installed.\n"
-            return 1
-        fi
+
+    local brew_bin
+    if [[ -x /opt/homebrew/bin/brew ]]; then
+        brew_bin=/opt/homebrew/bin/brew            # Apple Silicon
+    elif [[ -x /usr/local/bin/brew ]]; then
+        brew_bin=/usr/local/bin/brew               # Intel
     else
-        print_error "Failed to install packages with Homebrew\n"
+        err "Homebrew reported success but brew was not found."
+        return 1
+    fi
+
+    eval "$("$brew_bin" shellenv)"
+
+    # Make brew available in future login shells, exactly once.
+    local shellenv_line
+    shellenv_line="eval \"\$(${brew_bin} shellenv)\""
+    touch "$HOME/.zprofile"
+    if ! grep -qF "$shellenv_line" "$HOME/.zprofile"; then
+        printf '\n%s\n' "$shellenv_line" >> "$HOME/.zprofile"
+        ok "Added Homebrew to ~/.zprofile"
+    fi
+}
+
+install_brew_formulae() {
+    info "Installing command-line tools: ${FORMULAE[*]}"
+    local installed f
+    local failed=()
+    installed="$(brew list --formula 2>/dev/null || true)"
+    for f in "${FORMULAE[@]}"; do
+        if printf '%s\n' "$installed" | grep -qx "$f"; then
+            ok "$f already installed"
+        elif brew install "$f"; then
+            ok "$f installed"
+        else
+            failed+=("$f")
+        fi
+    done
+    if [[ "${#failed[@]}" -gt 0 ]]; then
+        err "Failed to install: ${failed[*]}"
         return 1
     fi
 }
 
-# Install dependencies on Linux
-install_linux_dependencies() {
-    if sudo apt install -y zsh git wget || sudo pacman -S zsh git wget || sudo dnf install -y zsh git wget || sudo yum install -y zsh git wget || pkg install git zsh wget ; then
-        print_success "zsh, wget, and git installed\n"
+install_brew_casks() {
+    info "Installing Nerd Fonts: ${CASKS[*]}"
+    local installed c
+    local failed=()
+    installed="$(brew list --cask 2>/dev/null || true)"
+    for c in "${CASKS[@]}"; do
+        if printf '%s\n' "$installed" | grep -qx "$c"; then
+            ok "$c already installed"
+        elif brew install --cask "$c"; then
+            ok "$c installed"
+        elif [[ "$c" == "$JBM_CASK" ]] && install_jbm_font_direct; then
+            :  # cask failed but the direct download covered it
+        else
+            failed+=("$c")
+        fi
+    done
+    if [[ "${#failed[@]}" -gt 0 ]]; then
+        err "Failed to install fonts: ${failed[*]}"
+        return 1
+    fi
+}
+
+# Fallback when the Homebrew cask is unavailable: fetch the official
+# nerd-fonts release archive and install the TTFs into ~/Library/Fonts
+# (per-user font install; no sudo required).
+install_jbm_font_direct() {
+    info "Cask unavailable — downloading JetBrains Mono Nerd Font directly..."
+    local tmp dest
+    tmp="$(mktemp -d)"
+    dest="$(font_dir)"
+    if curl -fsSL -o "$tmp/JetBrainsMono.zip" "$(jbm_font_url)" \
+        && unzip -oq "$tmp/JetBrainsMono.zip" '*.ttf' -d "$tmp/fonts" \
+        && mkdir -p "$dest" \
+        && cp "$tmp/fonts/"*.ttf "$dest/"; then
+        rm -rf "$tmp"
+        ok "JetBrains Mono Nerd Font installed into $dest"
         return 0
-    else
-        print_error "Please install the following packages first, then try again: zsh git wget \n"
-        return 1
     fi
+    rm -rf "$tmp"
+    err "Direct font download failed."
+    return 1
 }
 
 #######################################
-# SHELL CONFIGURATION FUNCTIONS
+# Filesystem layout and configuration
 #######################################
 
-# Change the default shell to ZSH
-change_default_shell() {
-    # 1. Determine the Zsh path based on OS
-    local zsh_path
-
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # On macOS, use the system zsh
-        zsh_path="/bin/zsh"
-        if [ ! -f "$zsh_path" ]; then
-            print_error "System Zsh not found at '$zsh_path'. Please ensure zsh is installed."
-            return 1
-        fi
-    else
-        # On other systems, use zsh from PATH
-        if ! zsh_path=$(which zsh); then
-            print_error "Zsh not found in your PATH. Please install Zsh first."
-            return 1
-        fi
-    fi
-
-    print_message "Zsh is located at: $zsh_path"
-
-    # 2. Check if the Zsh path is in /etc/shells.
-    local shells_file="/etc/shells"
-    if ! grep -q "^${zsh_path}$" "$shells_file"; then
-        print_message "'$zsh_path' is not listed in $shells_file."
-        print_message "We need to add it. This requires administrator privileges."
-
-        # 3. Add the Zsh path to /etc/shells using sudo.
-        # The 'tee' command is used to append to a file requiring root privileges.
-        if echo "$zsh_path" | sudo tee -a "$shells_file" > /dev/null; then
-            print_success "Successfully added '$zsh_path' to $shells_file."
-        else
-            print_error "Failed to add '$zsh_path' to $shells_file. Please check your permissions."
-            return 1
-        fi
-    else
-        print_success "'$zsh_path' is already in $shells_file."
-    fi
-
-    # 4. Change the shell.
-    print_message "Attempting to change the default shell to '$zsh_path'..."
-    if chsh -s "$zsh_path"; then
-        print_success "Default shell changed successfully."
-    else
-        print_error "Failed to change the shell with 'chsh'. Please try running 'chsh -s $zsh_path' manually."
-        return 1
-    fi
-
-    print_message "Default shell will be used in new terminal sessions."
-
-    # 5. Update Oh My Zsh if it exists.
-    # Check if the OMZ directory exists before trying to update.
-    print_message "Updating Oh My Zsh..."
-    # We run this in a subshell to avoid issues with the current script's environment.
-    if $zsh_path -i -c 'omz update'; then
-        print_success "Oh My Zsh update completed."
-    else
-        # A failed update is not critical, so we'll just warn the user.
-        print_error "Oh My Zsh update command finished with a non-zero status. Check the output above."
-    fi
-    
-    return 0
-}
-
-# Backup existing .zshrc file
 backup_zshrc() {
-    if mv -n ~/.zshrc ~/.zshrc-backup-$(date +"%Y-%m-%d"); then
-        print_success "Backed up the current .zshrc to .zshrc-backup-$(date +"%Y-%m-%d")\n"
+    local zshrc="$HOME/.zshrc"
+    [[ -f "$zshrc" ]] || return 0
+
+    if grep -q "ftazsh-managed" "$zshrc"; then
+        info "Existing ~/.zshrc is ftazsh-managed; no backup needed."
+        return 0
     fi
+
+    local backup
+    backup="$HOME/.zshrc-backup-$(date +%Y-%m-%d-%H%M%S)"
+    while [[ -e "$backup" ]]; do
+        backup="${backup}.1"
+    done
+    cp -p "$zshrc" "$backup"
+    ok "Backed up existing ~/.zshrc to ${backup##*/}"
 }
 
-## Set up ZDOTDIR to point to the ftazsh config directory
-#setup_zdotdir() {
-#    # This allows zsh to find configuration files in ~/.config/ftazsh
-#    echo 'export ZDOTDIR=~/.config/ftazsh' >> ~/.zshenv
-#    print_success "Set ZDOTDIR to ~/.config/ftazsh in ~/.zshenv"
-#}
-
-# Create necessary directories for ftazsh
 create_directories() {
-    # Create main configuration directory
-    mkdir -p ~/.config/ftazsh
-    
-    # Create directory for user-specific configurations
-    mkdir -p ~/.config/ftazsh/zshrc
-    
-    # Create cache directory for ZSH completion files
-    mkdir -p ~/.cache/zsh/
-    
-    # Move existing completion cache files if they exist
-    if [ -f ~/.zcompdump ]; then
-        mv ~/.zcompdump* ~/.cache/zsh/
-    fi
-    
-    print_success "Created necessary directories for ftazsh"
+    mkdir -p "$FTAZSH_HOME" "$FTAZSH_HOME/zshrc" "$HOME/.cache/zsh"
+
+    # Move stray completion dumps out of $HOME.
+    local f
+    for f in "$HOME"/.zcompdump*; do
+        [[ -e "$f" ]] || continue
+        mv -f "$f" "$HOME/.cache/zsh/"
+    done
+    ok "ftazsh directories ready ($FTAZSH_HOME)"
 }
 
-#######################################
-# PLUGINS AND THEMES INSTALLATION
-#######################################
-
-# Install or update Oh My Zsh
-install_oh_my_zsh() {
-    print_message "Installing oh-my-zsh\n"
-    if [ -d ~/.config/ftazsh/oh-my-zsh ]; then
-        print_message "oh-my-zsh is already installed\n"
-        git -C ~/.config/ftazsh/oh-my-zsh remote set-url origin https://github.com/ohmyzsh/ohmyzsh.git
-    elif [ -d ~/.oh-my-zsh ]; then
-        print_message "oh-my-zsh in already installed at '~/.oh-my-zsh'. Moving it to '~/.config/ftazsh/oh-my-zsh'"
-        export ZSH="$HOME/.config/ftazsh/oh-my-zsh"
-        mv ~/.oh-my-zsh ~/.config/ftazsh/oh-my-zsh
-        git -C ~/.config/ftazsh/oh-my-zsh remote set-url origin https://github.com/ohmyzsh/ohmyzsh.git
+install_omz() {
+    local dest="$FTAZSH_HOME/oh-my-zsh"
+    if [[ -d "$dest/.git" ]]; then
+        info "Updating oh-my-zsh..."
+        git -C "$dest" pull --ff-only --quiet \
+            || warn "oh-my-zsh update skipped (offline or local changes)."
     else
-        git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git ~/.config/ftazsh/oh-my-zsh
+        info "Installing oh-my-zsh..."
+        git clone --depth=1 --quiet "$(omz_repo)" "$dest"
+        ok "oh-my-zsh installed"
     fi
 }
 
-# Install or update Powerlevel10k theme
-install_powerlevel10k() {
-    print_message "Installing Powerlevel10k theme\n"
-    if [ -d ~/.config/ftazsh/oh-my-zsh/custom/themes/powerlevel10k ]; then
-        cd ~/.config/ftazsh/oh-my-zsh/custom/themes/powerlevel10k && git pull && cd -
-        print_success "Powerlevel10k theme updated\n"
-    else
-        git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/.config/ftazsh/oh-my-zsh/custom/themes/powerlevel10k
-        print_success "Powerlevel10k theme installed\n"
-    fi
-}
+install_plugin_repos() {
+    local custom="$FTAZSH_HOME/oh-my-zsh/custom/plugins"
+    mkdir -p "$custom"
 
-# Install or update ZSH plugins
-install_zsh_plugins() {
-    print_message "Installing ZSH plugins\n"
-    
-    # zsh-autosuggestions: Fish-like autosuggestions for ZSH
-    if [ -d ~/.config/ftazsh/oh-my-zsh/plugins/zsh-autosuggestions ]; then
-        cd ~/.config/ftazsh/oh-my-zsh/plugins/zsh-autosuggestions && git pull && cd -
-    else
-        git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions ~/.config/ftazsh/oh-my-zsh/plugins/zsh-autosuggestions
+    # Older ftazsh versions cloned zsh-autosuggestions inside the oh-my-zsh
+    # worktree, which dirties its git status and breaks `omz update`.
+    local legacy="$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions"
+    if [[ -d "$legacy" ]]; then
+        warn "Removing legacy plugin clone inside the oh-my-zsh tree."
+        rm -rf "$legacy"
     fi
 
-    # zsh-syntax-highlighting: Fish-like syntax highlighting for ZSH
-    if [ -d ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-syntax-highlighting ]; then
-        cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-syntax-highlighting && git pull && cd -
-    else
-        git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-syntax-highlighting
-    fi
-
-    # zsh-completions: Additional completion definitions for ZSH
-    if [ -d ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-completions ]; then
-        cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-completions && git pull && cd -
-    else
-        git clone --depth=1 https://github.com/zsh-users/zsh-completions ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-completions
-    fi
-
-    # zsh-history-substring-search: Fish-like history search for ZSH
-    if [ -d ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-history-substring-search ]; then
-        cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-history-substring-search && git pull && cd -
-    else
-        git clone --depth=1 https://github.com/zsh-users/zsh-history-substring-search ~/.config/ftazsh/oh-my-zsh/custom/plugins/zsh-history-substring-search
-    fi
-    
-    # k plugin (directory listings for ZSH with git features)
-    if [ -d ~/.config/ftazsh/oh-my-zsh/custom/plugins/k ]; then
-        cd ~/.config/ftazsh/oh-my-zsh/custom/plugins/k && git pull && cd -
-    else
-        git clone --depth 1 https://github.com/supercrabtree/k ~/.config/ftazsh/oh-my-zsh/custom/plugins/k
-    fi
-    
-    print_success "ZSH plugins installed\n"
-}
-
-# Install or update fzf (fuzzy finder)
-install_fzf() {
-    print_message "Installing fzf (fuzzy finder)\n"
-    if [ -d ~/.config/ftazsh/fzf ]; then
-        cd ~/.config/ftazsh/fzf && git pull && cd -
-        ~/.config/ftazsh/fzf/install --all --key-bindings --completion --no-update-rc
-    else
-        git clone --depth 1 https://github.com/junegunn/fzf.git ~/.config/ftazsh/fzf
-        ~/.config/ftazsh/fzf/install --all --key-bindings --completion --no-update-rc
-    fi
-    print_success "fzf installed\n"
-}
-
-# Install or update marker (bookmark your shell commands)
-install_marker() {
-    print_message "Installing marker (command bookmarker)\n"
-    if [ -d ~/.config/ftazsh/marker ]; then
-        cd ~/.config/ftazsh/marker && git pull && cd -
-    else
-        git clone --depth 1 https://github.com/jotyGill/marker ~/.config/ftazsh/marker
-    fi
-
-    # Run marker installation script
-    if ~/.config/ftazsh/marker/install.py; then
-        print_success "Installed Marker\n"
-    else
-        print_error "Marker Installation Had Issues\n"
-    fi
-    
-    # Return to original directory in case marker installation changed it
-    cd "$SCRIPT_DIR"
-}
-
-#######################################
-# FONTS INSTALLATION
-#######################################
-
-# Install or update Nerd Fonts
-install_nerd_fonts() {
-    print_message "Installing Nerd Fonts version of Hack, Roboto Mono, DejaVu Sans Mono, and JetBrains Mono\n"
-
-    # Check if nerd-fonts directory already exists
-    if [ -d "$SCRIPT_DIR/nerd-fonts" ]; then
-        print_message "Nerd Fonts repository already exists, checking for updates...\n"
-        # Store the current commit hash before pulling
-        cd "$SCRIPT_DIR/nerd-fonts"
-        BEFORE_HASH=$(git rev-parse HEAD)
-        git pull
-        AFTER_HASH=$(git rev-parse HEAD)
-
-        # Only install if there were updates
-        if [ "$BEFORE_HASH" != "$AFTER_HASH" ]; then
-            print_message "Updates found, reinstalling fonts...\n"
-            if chmod +x ./install.sh && ./install.sh; then
-                print_success "Nerd Fonts updated successfully\n"
-            else
-                print_error "There was an issue updating Nerd Fonts\n"
-            fi
+    local name dest
+    for name in "${PLUGINS[@]}"; do
+        dest="$custom/$name"
+        if [[ -d "$dest/.git" ]]; then
+            info "Updating $name..."
+            git -C "$dest" pull --ff-only --quiet \
+                || warn "$name update skipped (offline or local changes)."
         else
-            print_success "Nerd Fonts are already up to date\n"
+            info "Installing $name..."
+            git clone --depth=1 --quiet "$(plugin_base_url)/$name" "$dest"
         fi
-        cd "$SCRIPT_DIR"
-    else
-        cd "$SCRIPT_DIR"
-        git clone --depth 1 https://github.com/ryanoasis/nerd-fonts.git
-
-        # Install the fonts for the first time
-        if chmod +x ./nerd-fonts/install.sh && ./nerd-fonts/install.sh; then
-            print_success "Nerd Fonts installed successfully\n"
-        else
-            print_error "There was an issue installing Nerd Fonts\n"
-        fi
-    fi
-
-    # Keep the nerd-fonts repository for future updates
-    print_message "Keeping Nerd Fonts repository for future updates\n"
+    done
+    ok "zsh plugins ready"
 }
 
-#######################################
-# CONFIGURATION FILES INSTALLATION
-#######################################
+install_p10k() {
+    local dest="$FTAZSH_HOME/oh-my-zsh/custom/themes/powerlevel10k"
+    if [[ -d "$dest/.git" ]]; then
+        info "Updating Powerlevel10k..."
+        git -C "$dest" pull --ff-only --quiet \
+            || warn "Powerlevel10k update skipped (offline or local changes)."
+    else
+        info "Installing Powerlevel10k theme..."
+        git clone --depth=1 --quiet "$(p10k_repo)" "$dest"
+        ok "Powerlevel10k installed"
+    fi
+}
 
-# Copy configuration files to their respective locations
 copy_config_files() {
-    print_message "Copying configuration files\n"
-    
-    # Copy main configuration files
-    cp -f "$SCRIPT_DIR/.zshrc" ~/                                # Main .zshrc file
-    cp -f "$SCRIPT_DIR/ftazshrc.zsh" ~/.config/ftazsh/           # ftazsh main configuration
-    cp -f "$SCRIPT_DIR/p10k.zsh" ~/.config/ftazsh/               # Powerlevel10k theme configuration
-    
-    print_success "Main configuration files copied\n"
-    
-    # Copy example configuration
-    mkdir -p ~/.config/ftazsh/zshrc                                     # User's personal ZSH configurations go here
-    cp -f "$SCRIPT_DIR/personal_rc.zsh" ~/.config/ftazsh/zshrc/personal_rc.zsh  # Example configuration
-    
-    print_success "Personal configuration copied\n"
-}
+    info "Installing configuration files..."
+    cp -f "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"
+    cp -f "$SCRIPT_DIR/ftazshrc.zsh" "$FTAZSH_HOME/"
+    cp -f "$SCRIPT_DIR/tools.zsh" "$FTAZSH_HOME/"
+    cp -f "$SCRIPT_DIR/p10k.zsh" "$FTAZSH_HOME/"
 
-#######################################
-# HISTORY MIGRATION FUNCTIONS
-#######################################
-
-# Copy bash history to zsh history
-copy_bash_history() {
-    print_message "\nCopying bash_history to zsh_history\n"
-    if command -v python &>/dev/null; then
-        wget -q --show-progress https://gist.githubusercontent.com/muendelezaji/c14722ab66b505a49861b8a74e52b274/raw/49f0fb7f661bdf794742257f58950d209dd6cb62/bash-to-zsh-hist.py
-        cat ~/.bash_history | python bash-to-zsh-hist.py >> ~/.zsh_history
-        rm bash-to-zsh-hist.py
-        print_success "Bash history copied to Zsh history using Python\n"
+    # The personal config dir belongs to the user — only seed the example
+    # on first install, never overwrite anything in it.
+    if [[ ! -e "$FTAZSH_HOME/zshrc/personal_rc.zsh" ]]; then
+        cp "$SCRIPT_DIR/personal_rc.zsh" "$FTAZSH_HOME/zshrc/personal_rc.zsh"
+        ok "Example personal config seeded in ~/.config/ftazsh/zshrc/"
     else
-        if command -v python3 &>/dev/null; then
-            wget -q --show-progress https://gist.githubusercontent.com/muendelezaji/c14722ab66b505a49861b8a74e52b274/raw/49f0fb7f661bdf794742257f58950d209dd6cb62/bash-to-zsh-hist.py
-            cat ~/.bash_history | python3 bash-to-zsh-hist.py >> ~/.zsh_history
-            rm bash-to-zsh-hist.py
-            print_success "Bash history copied to Zsh history using Python3\n"
-        else
-            print_error "Python is not installed, can't copy bash_history to zsh_history\n"
-            return 1
-        fi
+        info "Personal config directory left untouched."
     fi
-    return 0
+    ok "Configuration installed"
 }
 
 #######################################
-# MAIN INSTALLATION FUNCTION
+# Login shell
 #######################################
 
-# Main installation function
-main() {
-    print_message "Starting ftazsh installation...\n"
-    
-    # Step 1: Install dependencies
-    print_message "Installing dependencies...\n"
-    if ! install_dependencies; then
-        print_error "Failed to install dependencies. Exiting.\n"
-        exit 1
+current_login_shell() {
+    local shell=""
+    if command -v dscl >/dev/null 2>&1; then
+        shell="$(dscl . -read "/Users/${USER:-$(id -un)}" UserShell 2>/dev/null | awk '{print $2}' || true)"
     fi
-    
-    # Step 2: Backup existing .zshrc and create directories
-    print_message "Setting up directories...\n"
+    [[ -n "$shell" ]] || shell="${SHELL:-}"
+    printf '%s' "$shell"
+}
+
+ensure_default_shell() {
+    local current
+    current="$(current_login_shell)"
+
+    if [[ "${current##*/}" == "zsh" ]]; then
+        ok "Login shell is already zsh ($current); nothing to change."
+        return 0
+    fi
+
+    if [[ "$UNATTENDED" -eq 1 ]]; then
+        info "Unattended mode: login shell unchanged. To switch later, run: chsh -s $ZSH_TARGET"
+        return 0
+    fi
+
+    if ! grep -qx "$ZSH_TARGET" "$(shells_file)"; then
+        info "Adding $ZSH_TARGET to $(shells_file) (requires sudo)..."
+        echo "$ZSH_TARGET" | sudo tee -a "$(shells_file)" >/dev/null
+    fi
+
+    info "Changing login shell to $ZSH_TARGET (you may be asked for your password)..."
+    chsh -s "$ZSH_TARGET"
+    ok "Login shell changed. Takes effect in new terminal windows."
+}
+
+#######################################
+# Main
+#######################################
+
+print_summary() {
+    echo
+    ok "ftazsh is installed! 🎉"
+    info "Next steps:"
+    echo "    1. Open a new terminal window (or run: exec zsh)"
+    echo "    2. Set your terminal font to 'JetBrainsMono Nerd Font' or 'Hack Nerd Font'"
+    echo "    3. iTerm2: import iterm2-profile.json (Settings → Profiles → Other Actions → Import JSON)"
+    echo "    4. Tune the prompt anytime with: p10k configure"
+    echo "    5. Put personal config in ~/.config/ftazsh/zshrc/ — ftazsh never touches that folder"
+}
+
+main() {
+    parse_args "$@"
+    info "Starting ftazsh installation..."
+    require_macos
+    ensure_homebrew
+    install_brew_formulae
+    install_brew_casks
     backup_zshrc
     create_directories
-
-#    # Step 3: Set up ZDOTDIR
-#    print_message "Setting up ZDOTDIR...\n"
-#    setup_zdotdir
-    
-    # Step 4: Install Oh My Zsh and plugins
-    print_message "Installing Oh My Zsh and plugins...\n"
-    install_oh_my_zsh
-    install_zsh_plugins
-    install_powerlevel10k
-    
-    # Step 5: Install additional tools
-    print_message "Installing additional tools...\n"
-    install_fzf
-    install_marker
-    
-    # Step 6: Install Nerd Fonts
-    print_message "Installing Nerd Fonts...\n"
-    install_nerd_fonts
-    
-    # Step 7: Copy configuration files
-    print_message "Copying configuration files...\n"
+    install_omz
+    install_plugin_repos
+    install_p10k
     copy_config_files
-    
-    # Step 8: Copy bash history to zsh history if requested
-    if [[ $1 == "--cp-hist" ]] || [[ $1 == "-c" ]]; then
-        print_message "Copying bash history to zsh history...\n"
-        copy_bash_history
-    else
-        print_message "Skipping bash history copy (use --cp-hist or -c to enable)\n"
-    fi
-    
-    # Step 9: Change default shell to ZSH
-    print_message "Changing default shell to ZSH...\n"
-    print_message "\nSudo access is needed to change default shell\n"
-    change_default_shell
-    
-    # Final message
-    echo ""
-    print_success "🎉 Installation successful!"
-    print_message "Please exit this terminal and start a new session for the changes to take effect."
+    ensure_default_shell
+    print_summary
 }
 
-# Run the main function with all arguments
-main "$@"
-
-# Return to original directory before exiting
-cd "$SCRIPT_DIR"
-exit 0
+# Run only when executed directly — sourcing (e.g. from tests) is side-effect free.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    trap 'err "Installation failed while running: ${BASH_COMMAND}"' ERR
+    main "$@"
+fi

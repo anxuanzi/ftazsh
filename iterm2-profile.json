@@ -226,7 +226,7 @@
     "Alpha Component" : 1,
     "Green Component" : 1
   },
-  "Normal Font" : "JetBrainsMonoNerdFontCompleteM-ExtraBold 14",
+  "Normal Font" : "JetBrainsMonoNF-ExtraBold 14",
   "Link Color" : {
     "Red Component" : 0,
     "Color Space" : "sRGB",
