@@ -1,10 +1,12 @@
-################# DO NOT MODIFY THIS FILE #######################
-####### PLACE YOUR CONFIGS IN ~/.config/ftazsh/zshrc FOLDER #######
-#################################################################
-
-# This file is created by ftazsh setup.
-# Place all your .zshrc configurations / overrides in a single or multiple files under ~/.config/ftazsh/zshrc/ folder
-# Your original .zshrc is backed up at ~/.zshrc-backup-%y-%m-%d
+# ftazsh-managed — do not edit; personal config goes in ~/.config/ftazsh/zshrc/
+#
+# Load order:
+#   1. Powerlevel10k instant prompt (cached)
+#   2. ftazshrc.zsh  — core setup, runs BEFORE oh-my-zsh
+#   3. p10k.zsh      — prompt configuration
+#   4. zshrc/*       — YOUR files (may append to $plugins, override anything)
+#   5. oh-my-zsh
+#   6. tools.zsh     — tool integrations + aliases, AFTER oh-my-zsh so they win
 
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
@@ -13,29 +15,23 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-# Load ftazsh configurations
-source "$HOME/.config/ftazsh/ftazshrc.zsh"
+FTAZSH_HOME="$HOME/.config/ftazsh"
 
-# To customize prompt look, edit ~/.config/ftazsh/p10k.zsh or run `p10k configure`
-[[ ! -f ~/.config/ftazsh/p10k.zsh ]] || source ~/.config/ftazsh/p10k.zsh
+# Core ftazsh configuration (oh-my-zsh settings, plugins, history, PATH).
+source "$FTAZSH_HOME/ftazshrc.zsh"
 
-# Any zshrc configurations under the folder ~/.config/ftazsh/zshrc/ will override the default ftazsh configs.
-# Place all of your personal configurations over there
-ZSH_CONFIGS_DIR="$HOME/.config/ftazsh/zshrc"
+# Prompt configuration — edit ~/.config/ftazsh/p10k.zsh or run `p10k configure`.
+[[ ! -f "$FTAZSH_HOME/p10k.zsh" ]] || source "$FTAZSH_HOME/p10k.zsh"
 
-for file in "$ZSH_CONFIGS_DIR"/*(DN); do
-    # Exclude '.' and '..' from being sourced
-    if [ -f "$file" ]; then
-        source "$file"
-    fi
+# Your personal configuration: every file in ~/.config/ftazsh/zshrc/ is
+# sourced in name order. ftazsh never modifies files in that directory.
+for _ftazsh_file in "$FTAZSH_HOME/zshrc"/*(N-.); do
+  source "$_ftazsh_file"
 done
+unset _ftazsh_file
 
-# Now source oh-my-zsh.sh so that any plugins added in ~/.config/ftazsh/zshrc/* files also get loaded
-source $ZSH/oh-my-zsh.sh
+source "$ZSH/oh-my-zsh.sh"
 
-
-# Configs that can only work after "source $ZSH/oh-my-zsh.sh", such as Aliases that depend oh-my-zsh plugins
-
-# Now source fzf.zsh , otherwise Ctr+r is overwritten by ohmyzsh
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-export FZF_DEFAULT_OPS="--extended"
+# Modern tool integrations and aliases (kept after oh-my-zsh on purpose:
+# oh-my-zsh defines its own `l` and Ctrl-R bindings, and these must win).
+source "$FTAZSH_HOME/tools.zsh"
