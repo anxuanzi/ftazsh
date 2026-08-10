@@ -1,187 +1,167 @@
-# ftazsh - Fast, Awesome ZSH Setup
+# ftazsh — a modern zsh environment for macOS
 
-A comprehensive ZSH configuration framework that provides a beautiful, informative, and feature-rich terminal experience. ftazsh is designed to work perfectly on macOS and Linux systems with minimal setup.
+One command sets up a complete terminal environment on a fresh (or not so
+fresh) Mac: [oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh), the
+[Powerlevel10k](https://github.com/romkatv/powerlevel10k) prompt, Nerd Fonts,
+fish-style shell behavior, and a curated set of modern unix tools — installed
+with Homebrew and already wired into the shell config.
 
-## What is ftazsh?
+**macOS only.** The installer refuses to run anywhere else.
 
-ftazsh is a carefully curated collection of ZSH tools and configurations that transforms your terminal into a powerful development environment. It combines the best features of:
+## What you get
 
-* [Oh My Zsh](https://github.com/ohmyzsh/ohmyzsh) - A delightful community-driven framework for managing your Zsh configuration
-* [Powerlevel10k](https://github.com/romkatv/powerlevel10k) - A beautiful and informative ZSH theme
-* [Nerd Fonts](https://github.com/ryanoasis/nerd-fonts) - Iconic font aggregator, collection, and patcher
-* Various plugins and tools that enhance your terminal experience
+**Modern unix tools**, installed via Homebrew and integrated out of the box:
 
-## Features
+| Tool | What it replaces | How ftazsh wires it in |
+|---|---|---|
+| [eza](https://github.com/eza-community/eza) | `ls` | `a` (detailed list with git status), `aa` (newest first) |
+| [bat](https://github.com/sharkdp/bat) | `cat` / pager | colored `man` pages, fzf file previews |
+| [fd](https://github.com/sharkdp/fd) | `find` | powers fzf file search (respects `.gitignore`) |
+| [ripgrep](https://github.com/BurntSushi/ripgrep) | `grep` | installed, ready to use as `rg` |
+| [fzf](https://github.com/junegunn/fzf) | — | `Ctrl-R` history, `Ctrl-T` files, `Alt-C` cd |
+| [zoxide](https://github.com/ajeetdsouza/zoxide) | `cd` | `z <fuzzy-dir>` jumps, `zi` interactive picker |
+| [jq](https://github.com/jqlang/jq) | — | installed, ready to use |
 
-ftazsh includes the following components:
+**Shell experience:**
 
-* **Powerlevel10k theme** - A fast, flexible, and powerful ZSH theme
-* **Nerd Fonts** - Fonts patched with icons for a beautiful terminal experience
-* **Useful plugins**:
-  * [zsh-completions](https://github.com/zsh-users/zsh-completions) - Additional completion definitions
-  * [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions) - Fish-like autosuggestions
-  * [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting) - Fish-like syntax highlighting
-  * [history-substring-search](https://github.com/zsh-users/zsh-history-substring-search) - Fish-like history search
-  * [fzf](https://github.com/junegunn/fzf) - A command-line fuzzy finder
-  * [k](https://github.com/supercrabtree/k) - Directory listings for ZSH with git features
-  * [marker](https://github.com/pindexis/marker) - Bookmark your shell commands
+* Powerlevel10k prompt (instant prompt enabled, config included)
+* Fish-style behavior: autosuggestions, syntax highlighting, ↑/↓ substring
+  history search
+* Extra completions (`zsh-completions`) and oh-my-zsh plugins:
+  `macos brew git python pip docker extract sudo`
+* 50k-line shared history, completion dumps kept out of `$HOME`
+* Helpers: `myip`, `cheat <topic>`, `speedtest`, `dadjoke`, `ipgeo [ip]`,
+  `l` (classic detailed `ls`), `e` (exit)
 
-* **Useful aliases and functions**:
-  * `l="ls --hyperlink=auto -lAhrtF"` - Enhanced list command (on macOS, hyperlink is automatically disabled)
-  * `a='eza -la --git --colour-scale all -g --smart-group --icons always'` - Better ls command (requires eza to be installed)
-  * `k="k -h"` - Show human-readable file sizes
-  * `e="exit"` - Quick exit
-  * `myip` - Quickly find out your external IP
-  * `cheat` - Access cheatsheets in the terminal
-  * `speedtest` - Run a network speed test
-  * `dadjoke` - Get a random dad joke
-  * `ipgeo` - Find geo location from an IP address
+**Fonts:** JetBrains Mono Nerd Font and Hack Nerd Font via Homebrew casks —
+no multi-gigabyte font repo clone.
 
-## Directory Structure
-
-ftazsh uses the following directory structure:
-
-```
-~/.config/ftazsh/           # Main configuration directory
-├── oh-my-zsh/              # Oh My Zsh installation
-├── zshrc/                  # Your personal ZSH configurations (add files here)
-├── ftazshrc.zsh            # Main ftazsh configuration
-├── p10k.zsh                # Powerlevel10k configuration
-├── fzf/                    # Fuzzy finder
-└── marker/                 # Command bookmarker
-```
-
-The repository itself is organized as follows:
-
-```
-ftazsh/                     # Repository root
-├── install.sh              # Main installation script
-├── .zshrc                  # Base .zshrc file (copied to user's home)
-├── ftazshrc.zsh            # Main configuration file
-├── p10k.zsh                # Powerlevel10k configuration
-├── scripts/                # Modular installation scripts
-│   ├── utils.sh            # Utility functions
-│   ├── dependencies.sh     # Dependencies installation
-│   ├── shell_config.sh     # Shell configuration
-│   ├── plugins_themes.sh   # Plugins and themes installation
-│   ├── fonts.sh            # Fonts installation
-│   ├── config_files.sh     # Configuration files installation
-│   └── history.sh          # History migration
-├── examples/               # Example configurations
-│   └── personal_rc.zsh     # Example personal configuration
-└── iterm2-profile.json     # iTerm2 profile for macOS users
-```
-
-## Installation
-
-### Requirements
-
-* macOS or Linux
-* `git` to clone the repository
-* `zsh` (on macOS, the system zsh at /bin/zsh will be used; on Linux, it will be installed if not present)
-* `wget` (will be installed if not present)
-
-### macOS Installation
+## Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/anxuanzi/ftazsh
 cd ftazsh
-
-# Run the installation script
 ./install.sh
-
-# Optional: Copy bash history to zsh history
-./install.sh -c
 ```
 
-The script will:
-1. Install Homebrew if not already installed (on macOS)
-2. Configure Homebrew in your .zprofile file (on macOS)
-3. Use the system zsh (/bin/zsh) on macOS
-4. Install required packages (git, wget) via Homebrew on macOS
-5. Back up your existing .zshrc file
-6. Install Oh My Zsh and plugins
-7. Install Nerd Fonts
-8. Set up the ftazsh configuration
+Re-running `./install.sh` later **updates** everything (oh-my-zsh, plugins,
+theme, configs). It is idempotent and safe.
 
-After installation, restart your terminal or run `source ~/.zshrc` to apply the changes.
+```
+Usage: ./install.sh [OPTIONS]
+  -h, --help        Show help
+      --unattended  Non-interactive: never prompts, skips changing the
+                    login shell (prints the command instead). For CI.
+```
 
-### Fonts
+The installer:
 
-For the best experience, change your terminal's font to one of the installed Nerd Fonts:
-* "Hack Nerd Font"
-* "RobotoMono Nerd Font"
-* "DejaVu Sans Mono Nerd Font"
+1. Installs Homebrew if missing (and adds it to `~/.zprofile`)
+2. Installs the tools and fonts listed above (skips what's already there)
+3. Backs up a pre-existing `~/.zshrc` to `~/.zshrc-backup-<timestamp>`
+4. Clones oh-my-zsh, plugins, and Powerlevel10k under `~/.config/ftazsh/`
+5. Installs the ftazsh config files
+6. Offers to make zsh your login shell — skipped automatically if it
+   already is (which is the macOS default)
 
-### iTerm2 Users
+Then open a new terminal window. Run `p10k configure` any time to restyle
+the prompt.
 
-If you're using iTerm2 on macOS, you can import the included profile:
-1. Open iTerm2
-2. Go to Preferences > Profiles
-3. Click the "+" button to create a new profile
-4. Click "Other Actions..." > "Import JSON Profiles..."
-5. Select the `iterm2-profile.json` file from the ftazsh directory
+### Terminal font
 
-## Customization
+Set your terminal's font to **JetBrainsMono Nerd Font** or **Hack Nerd
+Font** so prompt icons render. iTerm2 users can import the bundled profile
+(font pre-set): *Settings → Profiles → Other Actions… → Import JSON
+Profiles…* → pick `iterm2-profile.json`.
 
-### Adding Your Own Configurations
+## How the config is organized
 
-All personal configurations should be placed in the `~/.config/ftazsh/zshrc/` directory. You can create one or multiple files in this directory, and they will be automatically sourced when your shell starts.
+```
+~/.zshrc                      # thin orchestrator installed by ftazsh (marked "ftazsh-managed")
+~/.config/ftazsh/
+├── ftazshrc.zsh              # core setup, loads BEFORE oh-my-zsh
+├── p10k.zsh                  # Powerlevel10k prompt configuration
+├── tools.zsh                 # tool integrations + aliases, loads AFTER oh-my-zsh
+├── zshrc/                    # ← YOUR files live here (sourced in name order)
+│   └── personal_rc.zsh       # example, seeded once, never overwritten
+└── oh-my-zsh/                # oh-my-zsh + plugins + theme (managed by installer)
+```
 
-Example: Create a file `~/.config/ftazsh/zshrc/my_config.zsh` with your custom settings:
+Load order: instant prompt → `ftazshrc.zsh` → `p10k.zsh` → **your files** →
+oh-my-zsh → `tools.zsh`. Your files load before oh-my-zsh, so they can add
+plugins; `tools.zsh` loads after it, so ftazsh's aliases and keybindings
+can't be clobbered by oh-my-zsh defaults.
+
+Every tool integration is guarded — if a tool is missing, the shell still
+starts cleanly with stock behavior.
+
+### Customizing
+
+Put any number of files in `~/.config/ftazsh/zshrc/`. The installer never
+touches that directory (the example is seeded only on first install).
 
 ```zsh
-# Add more plugins
-plugins+=(docker docker-compose)
-
-# Custom aliases
-alias dc="docker-compose"
-alias k8s="kubectl"
-
-# Custom functions
-function mkcd() {
-  mkdir -p "$1" && cd "$1"
-}
+# ~/.config/ftazsh/zshrc/mine.zsh
+plugins+=(docker-compose kubectl)        # add oh-my-zsh plugins
+plugins=(${plugins:#docker})             # remove a default plugin
+alias dc="docker compose"
+export EDITOR="nvim"
 ```
 
-See the `examples/personal_rc.zsh` file for more examples.
+oh-my-zsh's built-in auto-update prompts are disabled on purpose — re-run
+`./install.sh` to update everything, including oh-my-zsh.
 
-### Customizing the Prompt
+## Uninstall
 
-The Powerlevel10k theme is highly customizable. You can run `p10k configure` to launch the configuration wizard, or edit `~/.config/ftazsh/p10k.zsh` directly.
+```bash
+./uninstall.sh        # add --yes to skip the confirmation
+```
+
+Restores your most recent `.zshrc` backup and removes `~/.config/ftazsh`.
+Homebrew tools and fonts are left installed; the exact `brew uninstall`
+commands are printed in case you want them gone too.
+
+## Development & testing
+
+The repo has a real test suite; everything except Homebrew itself runs in
+Docker:
+
+```bash
+make docker-test    # build the Linux test image and run lint + unit + integration
+make lint           # shellcheck + `zsh -n` on every config (host)
+make unit           # bats unit tests for installer/uninstaller functions
+make integration    # clones a real layout into a scratch HOME, boots zsh, asserts health
+```
+
+* Unit tests stub `uname`/`brew`/`chsh`/`dscl`, so no test touches your
+  system.
+* The integration test exercises the graceful-degradation paths on purpose
+  (the image has no `bat`/`fd`, and an fzf too old for `--zsh`).
+* CI runs the Linux suite plus a real `./install.sh --unattended` on a
+  macOS runner.
 
 ## Troubleshooting
 
-### Broken Icons or Fonts
+**Broken icons?** Your terminal isn't using a Nerd Font — see
+[Terminal font](#terminal-font) above.
 
-If icons or text appear broken in your terminal:
-1. Make sure you've installed the Nerd Fonts
-2. Set your terminal to use one of the Nerd Fonts (Hack, RobotoMono, or DejaVu Sans Mono)
-3. Ensure your terminal supports Unicode and has proper encoding settings
+**Prompt looks wrong over SSH / in a basic terminal?** That's Powerlevel10k
+adapting; run `p10k configure` to pick a more conservative style.
 
-### Command Not Found: eza
+**Where did my old `.zshrc` go?** `~/.zshrc-backup-<timestamp>` — the
+installer prints the exact name when it backs it up.
 
-The `a` and `aa` aliases use the `eza` command, which is not installed by default. To install it:
+## Changes from earlier ftazsh versions
 
-```bash
-# On macOS
-brew install eza
-
-# On Linux
-sudo apt install eza  # Debian/Ubuntu
-sudo dnf install eza  # Fedora
-```
-
-Or remove/modify these aliases in your personal configuration.
-
-## Notes
-
-* Your original .zshrc file is backed up to `.zshrc-backup-YYYY-MM-DD`
-* Marker's shortcut "Ctrl+t" is rebound to "Ctrl+b" to avoid conflicts with fzf
-* All Oh My Zsh plugins are installed under `~/.config/ftazsh/oh-my-zsh/plugins/`
-* Other tools (fzf, marker) are installed in `~/.config/ftazsh/`
-
-## Contributing
-
-Suggestions for more cool tools and improvements are always welcome! Feel free to open an issue or pull request.
+* Linux support removed — this is a macOS-only tool now.
+* Fonts come from Homebrew casks instead of cloning the nerd-fonts repo
+  (which was gigabytes). The iTerm2 profile now references the current
+  (v3) font name, `JetBrainsMonoNF-ExtraBold`.
+* `marker` (abandoned upstream) and the unused `k` plugin were dropped;
+  fzf's `Ctrl-R` and `zoxide` cover the same ground.
+* The oh-my-zsh `z` plugin was replaced by `zoxide`.
+* `--cp-hist` (bash→zsh history migration) was removed — macOS has
+  defaulted to zsh since 2019, and the feature piped a downloaded gist
+  into Python.
+* `wget` is no longer installed; macOS ships `curl`.
+* The config no longer exports `TERM`.
