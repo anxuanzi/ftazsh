@@ -1,7 +1,7 @@
 # ftazsh macOS Overhaul — Design
 
 **Date:** 2026-08-10
-**Status:** Approved for implementation (autonomous session; user directive: "well designed, written and tested, developer friendly, modern unix tools ready to go, macOS latest only, test in Docker")
+**Status:** Implemented and merged to main (2026-08-10). Original directive: "well designed, written and tested, developer friendly, modern unix tools ready to go, macOS latest only, test in Docker"
 **Branch:** `redesign/macos-overhaul`
 
 ## Goals
