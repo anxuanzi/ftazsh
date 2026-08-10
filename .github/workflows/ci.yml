@@ -10,13 +10,19 @@ jobs:
     name: Lint + unit + integration (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install test dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             zsh shellcheck bats fzf zoxide eza
+
+      # The runner image ships a world-writable /usr/share/zsh, which makes
+      # zsh's compaudit abort compinit in headless shells. Fix the image,
+      # don't weaken the security check for real users.
+      - name: Fix runner zsh directory permissions
+        run: sudo chmod -R g-w,o-w /usr/share/zsh
 
       - name: Lint (shellcheck + zsh -n)
         run: make lint
@@ -36,7 +42,7 @@ jobs:
       POWERLEVEL9K_INSTANT_PROMPT: "off"
       POWERLEVEL9K_DISABLE_GITSTATUS: "true"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run installer end to end (unattended)
         run: ./install.sh --unattended
@@ -52,9 +58,11 @@ jobs:
       - name: Managed .zshrc is installed
         run: grep -q "ftazsh-managed" "$HOME/.zshrc"
 
+      # fzf's --zsh option-restore prints a harmless "can't change option:
+      # zle" in tty-less interactive shells (CI only); filter exactly that.
       - name: Interactive zsh boots with no stderr output
         run: |
-          err="$(zsh -i -c exit 2>&1 >/dev/null)"
+          err="$(zsh -i -c exit 2>&1 >/dev/null | grep -v "can't change option: zle" || true)"
           if [ -n "$err" ]; then
             echo "stderr during boot:"
             printf '%s\n' "$err"

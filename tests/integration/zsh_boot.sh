@@ -15,6 +15,11 @@ trap 'rm -rf "$SCRATCH"' EXIT
 export HOME="$SCRATCH"
 export FTAZSH_HOME="$HOME/.config/ftazsh"
 
+# Don't let the invoking shell's environment leak into the boots under test
+# (e.g. a developer's own FZF_* exports from a previous ftazsh install).
+unset FZF_DEFAULT_OPTS FZF_DEFAULT_OPS FZF_DEFAULT_COMMAND \
+      FZF_CTRL_T_COMMAND FZF_CTRL_T_OPTS MANPAGER MANROFFOPT
+
 # Keep the prompt hermetic: no config wizard, no instant prompt console
 # output, no gitstatusd download.
 export POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
@@ -59,13 +64,19 @@ check() {
 echo "== Booting zsh and checking the environment =="
 
 # 1. A clean interactive boot must write nothing to stderr.
+# One known-benign line is filtered: fzf's --zsh script snapshots shell
+# options and eval-restores them; restoring `zle on` in an interactive but
+# tty-less zsh (CI runners, this harness) prints "can't change option: zle".
+# Real terminals have a tty and never emit it; fzf's widgets still bind.
 zsh -i -c exit 2>"$SCRATCH/boot-stderr.log" || true
-if [[ -s "$SCRATCH/boot-stderr.log" ]]; then
+grep -v "can't change option: zle" "$SCRATCH/boot-stderr.log" \
+    > "$SCRATCH/boot-stderr-filtered.log" || true
+if [[ -s "$SCRATCH/boot-stderr-filtered.log" ]]; then
     echo "FAIL: interactive boot wrote to stderr:" >&2
-    sed 's/^/    /' "$SCRATCH/boot-stderr.log" >&2
+    sed 's/^/    /' "$SCRATCH/boot-stderr-filtered.log" >&2
     FAIL=$((FAIL + 1))
 else
-    echo "ok: interactive boot is silent on stderr"
+    echo "ok: interactive boot is silent on stderr (headless-zle noise excluded)"
     PASS=$((PASS + 1))
 fi
 
