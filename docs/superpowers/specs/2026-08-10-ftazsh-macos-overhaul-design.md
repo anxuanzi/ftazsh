@@ -119,7 +119,7 @@ Every tool integration in `tools.zsh` is guarded with `command -v` — a machine
 | zoxide | `eval "$(zoxide init zsh)"` post-OMZ; replaces OMZ `z` |
 | jq | installed; no config needed |
 
-Fonts via Homebrew casks (`font-jetbrains-mono-nerd-font`, `font-hack-nerd-font`) — replaces the multi-GB nerd-fonts repo clone. iTerm profile font updated to the v3 name so the imported profile resolves.
+Fonts via Homebrew casks (`font-jetbrains-mono-nerd-font`, `font-hack-nerd-font`) — replaces the multi-GB nerd-fonts repo clone. If the JetBrains Mono cask fails, the installer falls back to downloading the official nerd-fonts release zip and copying the TTFs into `~/Library/Fonts` (URL/destination overridable via `FTAZSH_JBM_FONT_URL`/`FTAZSH_FONT_DIR` for tests). iTerm profile font updated to the v3 name so the imported profile resolves.
 
 ### Installer design (`install.sh`)
 

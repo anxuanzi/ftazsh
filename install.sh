@@ -20,18 +20,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FTAZSH_HOME="${FTAZSH_HOME:-$HOME/.config/ftazsh}"
 ZSH_TARGET="/bin/zsh"
-SHELLS_FILE="${FTAZSH_SHELLS_FILE:-/etc/shells}"
 UNATTENDED=0
 
 # Modern unix tools installed with Homebrew and wired up in tools.zsh.
 FORMULAE=(git eza bat fd ripgrep fzf zoxide jq)
 # Nerd Fonts (v3 naming). JetBrains Mono is used by the bundled iTerm2 profile.
-CASKS=(font-jetbrains-mono-nerd-font font-hack-nerd-font)
+JBM_CASK="font-jetbrains-mono-nerd-font"
+CASKS=("$JBM_CASK" font-hack-nerd-font)
+JBM_FONT_URL_DEFAULT="https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"
 
-# Repo sources — overridable so tests can point at local fixtures.
-OMZ_REPO="${FTAZSH_OMZ_REPO:-https://github.com/ohmyzsh/ohmyzsh.git}"
-P10K_REPO="${FTAZSH_P10K_REPO:-https://github.com/romkatv/powerlevel10k.git}"
-PLUGIN_BASE_URL="${FTAZSH_PLUGIN_BASE_URL:-https://github.com/zsh-users}"
+# Default sources. Each is overridable at call time via FTAZSH_* environment
+# variables (tests point them at local fixtures; see the *_url/file helpers).
+OMZ_REPO_DEFAULT="https://github.com/ohmyzsh/ohmyzsh.git"
+P10K_REPO_DEFAULT="https://github.com/romkatv/powerlevel10k.git"
+PLUGIN_BASE_URL_DEFAULT="https://github.com/zsh-users"
 PLUGINS=(zsh-autosuggestions zsh-syntax-highlighting zsh-completions)
 
 #######################################
@@ -42,6 +44,15 @@ info() { printf '🔵  %s\n' "$*"; }
 ok()   { printf '✅  %s\n' "$*"; }
 warn() { printf '⚠️   %s\n' "$*" >&2; }
 err()  { printf '❌  %s\n' "$*" >&2; }
+
+# Overridable sources, resolved when used (not when this file is sourced),
+# so tests can export FTAZSH_* after sourcing.
+omz_repo()        { printf '%s' "${FTAZSH_OMZ_REPO:-$OMZ_REPO_DEFAULT}"; }
+p10k_repo()       { printf '%s' "${FTAZSH_P10K_REPO:-$P10K_REPO_DEFAULT}"; }
+plugin_base_url() { printf '%s' "${FTAZSH_PLUGIN_BASE_URL:-$PLUGIN_BASE_URL_DEFAULT}"; }
+jbm_font_url()    { printf '%s' "${FTAZSH_JBM_FONT_URL:-$JBM_FONT_URL_DEFAULT}"; }
+font_dir()        { printf '%s' "${FTAZSH_FONT_DIR:-$HOME/Library/Fonts}"; }
+shells_file()     { printf '%s' "${FTAZSH_SHELLS_FILE:-/etc/shells}"; }
 
 usage() {
     cat <<'EOF'
@@ -158,6 +169,8 @@ install_brew_casks() {
             ok "$c already installed"
         elif brew install --cask "$c"; then
             ok "$c installed"
+        elif [[ "$c" == "$JBM_CASK" ]] && install_jbm_font_direct; then
+            :  # cask failed but the direct download covered it
         else
             failed+=("$c")
         fi
@@ -166,6 +179,27 @@ install_brew_casks() {
         err "Failed to install fonts: ${failed[*]}"
         return 1
     fi
+}
+
+# Fallback when the Homebrew cask is unavailable: fetch the official
+# nerd-fonts release archive and install the TTFs into ~/Library/Fonts
+# (per-user font install; no sudo required).
+install_jbm_font_direct() {
+    info "Cask unavailable — downloading JetBrains Mono Nerd Font directly..."
+    local tmp dest
+    tmp="$(mktemp -d)"
+    dest="$(font_dir)"
+    if curl -fsSL -o "$tmp/JetBrainsMono.zip" "$(jbm_font_url)" \
+        && unzip -oq "$tmp/JetBrainsMono.zip" '*.ttf' -d "$tmp/fonts" \
+        && mkdir -p "$dest" \
+        && cp "$tmp/fonts/"*.ttf "$dest/"; then
+        rm -rf "$tmp"
+        ok "JetBrains Mono Nerd Font installed into $dest"
+        return 0
+    fi
+    rm -rf "$tmp"
+    err "Direct font download failed."
+    return 1
 }
 
 #######################################
@@ -210,7 +244,7 @@ install_omz() {
             || warn "oh-my-zsh update skipped (offline or local changes)."
     else
         info "Installing oh-my-zsh..."
-        git clone --depth=1 --quiet "$OMZ_REPO" "$dest"
+        git clone --depth=1 --quiet "$(omz_repo)" "$dest"
         ok "oh-my-zsh installed"
     fi
 }
@@ -236,7 +270,7 @@ install_plugin_repos() {
                 || warn "$name update skipped (offline or local changes)."
         else
             info "Installing $name..."
-            git clone --depth=1 --quiet "$PLUGIN_BASE_URL/$name" "$dest"
+            git clone --depth=1 --quiet "$(plugin_base_url)/$name" "$dest"
         fi
     done
     ok "zsh plugins ready"
@@ -250,7 +284,7 @@ install_p10k() {
             || warn "Powerlevel10k update skipped (offline or local changes)."
     else
         info "Installing Powerlevel10k theme..."
-        git clone --depth=1 --quiet "$P10K_REPO" "$dest"
+        git clone --depth=1 --quiet "$(p10k_repo)" "$dest"
         ok "Powerlevel10k installed"
     fi
 }
@@ -300,9 +334,9 @@ ensure_default_shell() {
         return 0
     fi
 
-    if ! grep -qx "$ZSH_TARGET" "$SHELLS_FILE"; then
-        info "Adding $ZSH_TARGET to $SHELLS_FILE (requires sudo)..."
-        echo "$ZSH_TARGET" | sudo tee -a "$SHELLS_FILE" >/dev/null
+    if ! grep -qx "$ZSH_TARGET" "$(shells_file)"; then
+        info "Adding $ZSH_TARGET to $(shells_file) (requires sudo)..."
+        echo "$ZSH_TARGET" | sudo tee -a "$(shells_file)" >/dev/null
     fi
 
     info "Changing login shell to $ZSH_TARGET (you may be asked for your password)..."

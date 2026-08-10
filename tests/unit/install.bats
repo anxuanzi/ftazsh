@@ -189,6 +189,34 @@ setup() {
     grep -q "font-hack-nerd-font" "$STUB_LOG"
 }
 
+@test "JBM cask failure falls back to direct download and installs TTFs" {
+    export BREW_FAIL_ON="font-jetbrains-mono-nerd-font"
+    make_fixture_font_zip "$BATS_TEST_TMPDIR/jbm.zip"
+    export FTAZSH_JBM_FONT_URL="file://$BATS_TEST_TMPDIR/jbm.zip"
+    export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts-dest"
+    run install_brew_casks
+    [ "$status" -eq 0 ]
+    [ -f "$FTAZSH_FONT_DIR/JetBrainsMonoNerdFont-ExtraBold.ttf" ]
+    [ -f "$FTAZSH_FONT_DIR/JetBrainsMonoNerdFont-Regular.ttf" ]
+}
+
+@test "JBM cask failure with a broken download URL fails and names the font" {
+    export BREW_FAIL_ON="font-jetbrains-mono-nerd-font"
+    export FTAZSH_JBM_FONT_URL="file://$BATS_TEST_TMPDIR/nonexistent.zip"
+    export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts-dest"
+    run install_brew_casks
+    [ "$status" -ne 0 ]
+    [[ "$output" == *font-jetbrains-mono-nerd-font* ]]
+}
+
+@test "hack cask failure does not trigger the JBM fallback" {
+    export BREW_FAIL_ON="font-hack-nerd-font"
+    export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts-dest"
+    run install_brew_casks
+    [ "$status" -ne 0 ]
+    [ ! -d "$FTAZSH_FONT_DIR" ]
+}
+
 # ---------- default shell ----------
 
 @test "ensure_default_shell skips when login shell is already zsh" {

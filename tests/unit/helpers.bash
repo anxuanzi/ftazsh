@@ -77,6 +77,16 @@ source_installer() {
     trap - ERR
 }
 
+# Build a zip of fake TTFs, for font-fallback tests (served via file:// URL).
+# usage: make_fixture_font_zip <absolute/path/to/out.zip>
+make_fixture_font_zip() {
+    local out="$1" dir
+    dir="$(mktemp -d "$BATS_TEST_TMPDIR/fontsrc.XXXXXX")"
+    echo "fake font data" > "$dir/JetBrainsMonoNerdFont-Regular.ttf"
+    echo "fake font data" > "$dir/JetBrainsMonoNerdFont-ExtraBold.ttf"
+    (cd "$dir" && zip -q "$out" ./*.ttf)
+}
+
 # Build a local git repo fixture that can be cloned via file://
 # usage: make_fixture_repo <parent_dir> <name>
 make_fixture_repo() {

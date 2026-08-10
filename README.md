@@ -34,7 +34,9 @@ with Homebrew and already wired into the shell config.
   `l` (classic detailed `ls`), `e` (exit)
 
 **Fonts:** JetBrains Mono Nerd Font and Hack Nerd Font via Homebrew casks —
-no multi-gigabyte font repo clone.
+no multi-gigabyte font repo clone. If the JetBrains Mono cask ever fails,
+the installer automatically falls back to downloading the official
+nerd-fonts release and installing the TTFs into `~/Library/Fonts`.
 
 ## Install
 
