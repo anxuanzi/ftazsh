@@ -300,9 +300,11 @@ make integration    # real layout in a scratch HOME: zsh boot, reftable prompt, 
   prompt in a real pseudo-terminal for a reftable repository (with gitstatusd
   when it can be fetched), and runs the whole `ftazsh update` flow against a
   local upstream.
-* CI runs the Linux suite plus a real `./install.sh --unattended` on a
-  macOS runner: tools on PATH, Homebrew git as default, reftable prompt,
-  `ftazsh doctor`, the update flow, and uninstall.
+* CI runs the Linux suite plus, on GitHub's macOS runners, a real
+  `./install.sh --unattended` (tools on PATH, Homebrew git as default,
+  reftable prompt, `ftazsh doctor`, the update flow, uninstall) **and** the
+  sandboxed smoke test below. The workflow can also be started by hand from
+  the repository's Actions tab (*Run workflow*).
 
 ### Testing on your own Mac
 
@@ -310,7 +312,8 @@ make integration    # real layout in a scratch HOME: zsh boot, reftable prompt, 
 make mac-test                       # bash tests/macos/smoke.sh [--yes] [--keep-tools] [--keep-sandbox]
 ```
 
-Runs the real installer against a **throwaway HOME**: your `~/.zshrc`,
+Runs the real installer against a **throwaway HOME** (CI runs exactly this
+script on a macOS runner too): your `~/.zshrc`,
 `~/.gitconfig`, `~/.config/ftazsh`, caches and history are never touched.
 Homebrew is machine-wide, so the tools and fonts are installed for real —
 and at the end the script uninstalls exactly those that were not on the

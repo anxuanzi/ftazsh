@@ -169,6 +169,17 @@ check() {
 # zshi CODE — run CODE in an interactive ftazsh shell (booted from the sandbox HOME).
 zshi() { zsh -i -c "$1"; }
 
+# `ftazsh doctor` must pass. The one finding tolerated is a login shell that
+# is not zsh: that is a property of the machine (CI runners use bash), not of
+# ftazsh, and the summary line is the second ❌ in that case.
+doctor_ok() {
+    local out rc
+    out="$(zsh -i -c 'ftazsh doctor' 2>&1)" && rc=0 || rc=$?
+    printf '%s\n' "$out"
+    [[ "$rc" -eq 0 ]] && return 0
+    [[ "$(printf '%s\n' "$out" | grep -c '❌')" -eq 2 ]] && printf '%s\n' "$out" | grep -q 'Login shell'
+}
+
 #######################################
 # Install
 #######################################
@@ -206,7 +217,7 @@ check "delta is the git pager (via ftazsh-pager)" bash -c '
     git config --get core.pager | grep -q ftazsh-pager
     printf "diff --git a/x b/x\n" | "$HOME/.config/ftazsh/bin/ftazsh-pager" --color-only >/dev/null'
 check "ftazsh version" zshi 'ftazsh version'
-check "ftazsh doctor passes" zshi 'ftazsh doctor'
+check "ftazsh doctor passes (a non-zsh login shell is the one tolerated finding)" doctor_ok
 check "ftazsh reftable status" zshi 'ftazsh reftable status'
 check "p10k reftable shim active" zshi '(( FTAZSH_P10K_SHIM ))'
 

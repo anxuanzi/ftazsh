@@ -175,11 +175,13 @@ pile up copies.
   and classic repos with gitstatusd when fetchable, collector unit checks
   (detached, staged, stash, merge, cherry-pick), the update flow with the
   startup reminder, uninstall.
-* **CI:** Linux job (lint/unit/integration; runner git ≥ 2.45) and macOS job:
-  real install, tools, Homebrew git default, boot, git include + pager,
-  doctor, reftable prompt render, update flow against a local upstream branch,
-  idempotent re-install, uninstall. Docker image installs git from the
-  git-core PPA for the reftable checks.
+* **CI:** Linux job (lint/unit/integration; runner git ≥ 2.45), a macOS job
+  (real install, tools, Homebrew git default, boot, git include + pager,
+  doctor, reftable prompt render, update flow against a local upstream
+  branch, idempotent re-install, uninstall) and a second macOS job that runs
+  the sandboxed smoke test below on the runner. `workflow_dispatch` allows
+  on-demand runs. Docker image installs git from the git-core PPA for the
+  reftable checks.
 * **On the maintainer's Mac:** `tests/macos/smoke.sh` (`make mac-test`) —
   sandboxed `HOME`, real Homebrew (with `HOMEBREW_CASK_OPTS=--fontdir` and
   `HOMEBREW_CACHE` pointed at the real locations), records pre-existing

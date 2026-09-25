@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:   # run the whole suite on demand from the Actions tab
 
 jobs:
   linux:
@@ -152,3 +153,16 @@ jobs:
           [ ! -d "$HOME/.config/ftazsh" ]
           if [ -f "$HOME/.zshrc" ] && grep -q ftazsh-managed "$HOME/.zshrc"; then echo "managed .zshrc left behind"; exit 1; fi
           if git config --global --get-all include.path 2>/dev/null | grep -q ftazsh; then echo "git include left behind"; exit 1; fi
+
+  macos-smoke:
+    name: Sandboxed smoke test (macOS, real gitstatusd)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The same script a maintainer runs with `make mac-test`: a real install
+      # into a throwaway HOME with the real Homebrew and gitstatusd, the
+      # reftable prompt and migration, the update flow and reminder, an
+      # idempotent re-install, uninstall, and cleanup of what it installed.
+      - name: Run tests/macos/smoke.sh
+        run: bash tests/macos/smoke.sh --yes
