@@ -151,7 +151,7 @@ check "zsh-autosuggestions defaults: history then completion strategy" \
 check "zsh-syntax-highlighting defaults: brackets + pattern highlighters, visible comments" \
     '(( ${ZSH_HIGHLIGHT_HIGHLIGHTERS[(Ie)main]} && ${ZSH_HIGHLIGHT_HIGHLIGHTERS[(Ie)brackets]} && ${ZSH_HIGHLIGHT_HIGHLIGHTERS[(Ie)pattern]} )) && [[ -n "$ZSH_HIGHLIGHT_STYLES[comment]" && -n "$ZSH_HIGHLIGHT_PATTERNS[rm -rf *]" ]]'
 check "history-substring-search: unique results, arrows and Ctrl-P/N bound" \
-    '[[ "$HISTORY_SUBSTRING_SEARCH_ENSURE_UNIQUE" == 1 ]] && bindkey -M emacs "^P" | grep -q history-substring-search-up && bindkey -M emacs "^N" | grep -q history-substring-search-down && bindkey "^[[A" | grep -q history-substring-search-up && bindkey "$terminfo[kcuu1]" | grep -q history-substring-search-up'
+    '[[ "$HISTORY_SUBSTRING_SEARCH_ENSURE_UNIQUE" == 1 ]] && bindkey -M emacs "^P" | grep -q history-substring-search-up && bindkey -M emacs "^N" | grep -q history-substring-search-down && bindkey "^[[A" | grep -q history-substring-search-up && { [[ -z "${terminfo[kcuu1]:-}" ]] || bindkey "$terminfo[kcuu1]" | grep -q history-substring-search-up; }'
 check "completion menu: grouped with descriptions, case-insensitive matching" \
     'zstyle -L ":completion:*" group-name | grep -q group-name && zstyle -L ":completion:*:descriptions" format | grep -q "%d" && zstyle -L ":completion:*" matcher-list | grep -q "m:{"'
 check "completions available for tools (zsh-completions and fzf widgets registered)" \
