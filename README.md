@@ -17,7 +17,7 @@ Intel). The installer refuses to run anywhere else. Works with Homebrew 5–7.
 | Tool | What it replaces | How ftazsh wires it in |
 |---|---|---|
 | [git](https://git-scm.com) (Homebrew, 2.55+) | Apple's older git | Made the default `git`; reftable-ready ([details](#git)) |
-| [eza](https://github.com/eza-community/eza) | `ls`, `tree` | `a` (detailed list with git status), `aa` (newest first), `tree` |
+| [eza](https://github.com/eza-community/eza) | `ls`, `tree` | **is** `ls`: icons, colors, directories first; `ll`/`la` long views with git status, `l` (oldest → newest), `lt` (tree), `a`/`aa` |
 | [bat](https://github.com/sharkdp/bat) | `cat` / pager | colored `man` pages, fzf file previews |
 | [fd](https://github.com/sharkdp/fd) | `find` | powers fzf file and directory search (respects `.gitignore`) |
 | [ripgrep](https://github.com/BurntSushi/ripgrep) | `grep` | installed, ready to use as `rg` |
@@ -39,18 +39,36 @@ Intel). The installer refuses to run anywhere else. Works with Homebrew 5–7.
 
 Completions for all of them are on `fpath` before oh-my-zsh runs `compinit`.
 
-**Shell experience:**
+**Shell experience** (all of it is on by default; nothing to enable):
 
 * Powerlevel10k prompt (instant prompt enabled, config included) — and it stays
   correct inside [reftable](#reftable) git repositories, which stock
   Powerlevel10k cannot read
-* Fish-style behavior: autosuggestions, syntax highlighting, ↑/↓ substring
-  history search
-* Extra completions (`zsh-completions`) and oh-my-zsh plugins:
-  `macos brew git python pip docker extract sudo`
+* [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions): a
+  grey suggestion appears as you type, from your history first and then from
+  what Tab would complete. → or End accepts it, Ctrl-→ / Alt-F accepts one
+  word.
+* [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting):
+  valid commands green, unknown ones red, matching brackets highlighted,
+  `rm -rf *` flagged in red.
+* [zsh-history-substring-search](https://github.com/zsh-users/zsh-history-substring-search):
+  type part of a command, then ↑/↓ (or Ctrl-P / Ctrl-N) walk through the
+  commands containing it, each shown once.
+* [zsh-completions](https://github.com/zsh-users/zsh-completions) plus the
+  completions Homebrew ships for every installed tool: Tab opens a grouped,
+  described menu you can navigate with the arrow keys; matching is case- and
+  hyphen-insensitive.
+* oh-my-zsh plugins `macos brew git python pip docker extract sudo`
 * 50k-line shared history, completion dumps kept out of `$HOME`
-* Helpers: `myip`, `cheat <topic>`, `speedtest`, `dadjoke`, `ipgeo [ip]`,
-  `l` (classic detailed `ls`), `e` (exit)
+* Helpers: `myip`, `cheat <topic>`, `speedtest`, `dadjoke`, `ipgeo [ip]`, `e` (exit)
+
+**`ls` is eza.** `ls` lists with icons and colors, directories first; `ll`
+and `la` are long views with a header and each file's git status; `l` shows
+everything oldest → newest; `lt` is a two-level tree; `a`/`aa` add
+color-scaled sizes and dates. Icons only appear on a terminal, so piping
+`ls` into other commands keeps working. eza's flags differ from BSD ls in
+places (`ls -lt` is `ll -s modified`, `ls -lS` is `ll -s size`); the original
+is one escape away: `\ls`.
 
 **Fonts:** twelve families, installed per user into `~/Library/Fonts` (where
 macOS looks for a user's fonts; every app sees them, no admin rights needed):
@@ -382,6 +400,10 @@ first on `PATH` in every interactive shell. If your own files in
 **Broken icons?** Your terminal isn't using a Nerd Font — see
 [Terminal font](#terminal-font) above.
 
+**`ls -lt` complains about `--time`?** `ls` is eza, whose flags differ from
+BSD ls: sort with `ll -s modified` (add `-r` to reverse) or `ll -s size`, or
+use `\ls -lt` for the original.
+
 **Prompt looks wrong over SSH / in a basic terminal?** That's Powerlevel10k
 adapting; run `p10k configure` to pick a more conservative style.
 
@@ -401,6 +423,11 @@ installer prints the exact name when it backs it up.
 * Tools added: delta, difftastic, lazygit, gh, dust, duf, procs, btop, sd,
   hyperfine, tealdeer, yazi (all Homebrew-bottled for macOS 26/27 on Apple
   Silicon). fzf `Ctrl-R` preview toggle, `Alt-C` directory previews, `tree`.
+* `ls` is eza (icons, colors, directories first, git status in `ll`/`la`).
+* The zsh-users plugins come configured: suggestions from history then
+  completion, brackets and dangerous-pattern highlighting with readable
+  comments, unique substring history search with Ctrl-P/N and vi keys, and a
+  grouped, described completion menu.
 * Fonts: twelve families instead of two (Meslo LGS, Fira Code, Cascadia,
   Source Code Pro and the Symbols-only Nerd Fonts, plus the plain editor
   versions), each Nerd Font with a release-download fallback, and a presence

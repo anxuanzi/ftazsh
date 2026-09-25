@@ -223,6 +223,8 @@ check "interactive zsh boots with no stderr output" bash -c '
 check "fzf + zoxide integrations active" bash -c '
     zsh -i -c "whence fzf-history-widget >/dev/null && whence __zoxide_z >/dev/null && [[ -n \$FZF_DEFAULT_OPTS ]]"'
 check "eza alias runs" zshi 'cd "$HOME" && a >/dev/null'
+check "eza is the default ls with icons/colors/git (ls, ll, la, l, lt run)" zshi 'alias ls | grep -q eza && cd "$HOME" && ls >/dev/null && ll >/dev/null && la >/dev/null && l >/dev/null && lt >/dev/null'
+check "fish-style plugin defaults active" zshi '[[ "${ZSH_AUTOSUGGEST_STRATEGY[*]}" == "history completion" ]] && (( ${ZSH_HIGHLIGHT_HIGHLIGHTERS[(Ie)brackets]} )) && [[ "$HISTORY_SUBSTRING_SEARCH_ENSURE_UNIQUE" == 1 ]] && bindkey -M emacs "^P" | grep -q history-substring-search-up'
 check "yazi wrapper, lazygit alias, tldr present" zshi 'whence y >/dev/null && alias lg >/dev/null && command -v tldr >/dev/null'
 check "git config include present, user settings kept" bash -c '
     git config --global --get-all include.path | grep -qx "$HOME/.config/ftazsh/gitconfig"

@@ -41,11 +41,20 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 # so oh-my-zsh's own update prompts are disabled.
 zstyle ':omz:update' mode disabled
 
+# Completion: case-insensitive, `-` and `_` interchangeable, a marker while
+# slow completions are computed. (Menu selection, colors and caching are
+# oh-my-zsh defaults; the menu look is refined in tools.zsh.)
+HYPHEN_INSENSITIVE="true"
+COMPLETION_WAITING_DOTS="true"
+
 # Keep completion dumps out of $HOME.
 command mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
 export ZSH_COMPDUMP="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/.zcompdump-${HOST%%.*}-${ZSH_VERSION}"
 
-# Extra completion definitions (fpath must be extended before compinit runs).
+# zsh-completions: extra completion definitions for hundreds of commands.
+# Used the way its README recommends for oh-my-zsh: on fpath before compinit
+# (which oh-my-zsh runs), not as a plugin. oh-my-zsh rebuilds its completion
+# dump whenever fpath changes, so nothing needs a manual `compinit`.
 fpath+=("$ZSH/custom/plugins/zsh-completions/src")
 
 #------------------------------------------------------------------------------
@@ -62,9 +71,10 @@ plugins=(
     docker
     extract                  # `extract <any-archive>`
     sudo                     # press ESC twice to prepend sudo
-    zsh-autosuggestions      # fish-like inline suggestions
-    zsh-syntax-highlighting  # fish-like command coloring
-    history-substring-search # type, then ↑/↓ to search matching history
+    zsh-autosuggestions      # fish-like inline suggestions (zsh-users, cloned by the installer)
+    zsh-syntax-highlighting  # fish-like command coloring (zsh-users, cloned by the installer)
+    history-substring-search # type, then ↑/↓ to search matching history (zsh-users' script,
+                             # bundled with oh-my-zsh, which also binds the arrow keys)
 )
 
 # macOS-only plugins (prepended so the widget-wrapping plugins stay last).
