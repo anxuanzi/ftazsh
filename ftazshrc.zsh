@@ -2,12 +2,42 @@
 # Override anything set here from your own files in ~/.config/ftazsh/zshrc/.
 
 #------------------------------------------------------------------------------
+# HOMEBREW — tools (including git) installed by Homebrew come first
+#------------------------------------------------------------------------------
+# Terminals normally get Homebrew from ~/.zprofile, but not every shell is a
+# login shell. Set it up here if needed, then make sure Homebrew's bin dirs
+# lead PATH so Homebrew's git (the latest, reftable-capable one) is *the* git,
+# not the older one that ships with Xcode's command line tools.
+if [[ -z "$HOMEBREW_PREFIX" ]]; then
+    for _ftazsh_brew in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [[ -x "$_ftazsh_brew" ]]; then
+            eval "$("$_ftazsh_brew" shellenv)"
+            break
+        fi
+    done
+    unset _ftazsh_brew
+fi
+typeset -U path fpath
+if [[ -n "$HOMEBREW_PREFIX" ]]; then
+    path=("$HOMEBREW_PREFIX/bin" "$HOMEBREW_PREFIX/sbin" $path)
+    # Completions for Homebrew-installed tools (gh, eza, fd, rg, delta, …).
+    # Must be on fpath before oh-my-zsh runs compinit. Appended, not
+    # prepended, so zsh's own `_git` (which oh-my-zsh's git plugin builds
+    # on) keeps precedence over git's bundled completion script.
+    [[ ! -d "$HOMEBREW_PREFIX/share/zsh/site-functions" ]] \
+        || fpath+=("$HOMEBREW_PREFIX/share/zsh/site-functions")
+fi
+
+# The `ftazsh` command (update, doctor, reinstall, …).
+path=("${FTAZSH_HOME:-$HOME/.config/ftazsh}/bin" $path)
+
+#------------------------------------------------------------------------------
 # OH MY ZSH
 #------------------------------------------------------------------------------
 export ZSH="$HOME/.config/ftazsh/oh-my-zsh"
 ZSH_THEME="powerlevel10k/powerlevel10k"
 
-# ftazsh manages oh-my-zsh with git (re-run install.sh to update everything),
+# ftazsh manages oh-my-zsh with git (`ftazsh update` updates everything),
 # so oh-my-zsh's own update prompts are disabled.
 zstyle ':omz:update' mode disabled
 

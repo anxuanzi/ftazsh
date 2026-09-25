@@ -1,11 +1,19 @@
 # Linux test image for ftazsh: runs lint, unit and integration tests.
 # Deliberately includes fzf/zoxide/eza but NOT bat/fd, so the config's
 # graceful-degradation guards are exercised (and old apt fzf lacks --zsh).
+# git comes from the git-core PPA: the reftable tests need git >= 2.45.
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        zsh git curl ca-certificates locales make shellcheck bats \
+        ca-certificates curl gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF911AB184317630C59970973E363C90F8F1B6217" \
+        | gpg --dearmor -o /etc/apt/keyrings/git-core.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/git-core.gpg] https://ppa.launchpadcontent.net/git-core/ppa/ubuntu noble main" \
+        > /etc/apt/sources.list.d/git-core.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        zsh git locales make shellcheck bats \
         fzf zoxide eza zip unzip \
     && rm -rf /var/lib/apt/lists/* \
     && locale-gen en_US.UTF-8

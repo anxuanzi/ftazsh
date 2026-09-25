@@ -13,6 +13,8 @@ if command -v eza >/dev/null; then
     # The modern ls. `a` = everything with git status; `aa` = newest first.
     alias a='eza -la --git --colour-scale=all -g --smart-group --icons=always'
     alias aa='eza -la --git --colour-scale=all -g --smart-group --icons=always -s modified -r'
+    # macOS ships no `tree`; eza has one built in.
+    command -v tree >/dev/null || alias tree='eza --tree --icons=always --git-ignore'
 fi
 
 #------------------------------------------------------------------------------
@@ -30,13 +32,19 @@ if command -v fzf >/dev/null; then
     # `fzf --zsh` needs fzf ≥ 0.48 (Homebrew's is). Older fzf degrades silently.
     source <(fzf --zsh 2>/dev/null)
     export FZF_DEFAULT_OPTS="--height=40% --layout=reverse --border --info=inline"
+    # Ctrl-R: Ctrl-/ toggles a preview of the full command line.
+    export FZF_CTRL_R_OPTS="--preview 'echo {}' --preview-window up:3:hidden:wrap --bind 'ctrl-/:toggle-preview'"
     if command -v fd >/dev/null; then
         # Respect .gitignore, include hidden files.
         export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
         export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+        export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
     fi
     if command -v bat >/dev/null; then
         export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers --line-range=:200 {}'"
+    fi
+    if command -v eza >/dev/null; then
+        export FZF_ALT_C_OPTS="--preview 'eza --tree --level=2 --colour=always --icons=always {} | head -200'"
     fi
 fi
 
@@ -46,6 +54,32 @@ fi
 if command -v zoxide >/dev/null; then
     eval "$(zoxide init zsh)"
 fi
+
+#------------------------------------------------------------------------------
+# GIT TOOLS — lazygit (lg), delta and difftastic are wired up in gitconfig
+#------------------------------------------------------------------------------
+if command -v lazygit >/dev/null; then
+    alias lg='lazygit'
+fi
+
+#------------------------------------------------------------------------------
+# YAZI — terminal file manager: `y` opens it and cds to where you quit (q)
+#------------------------------------------------------------------------------
+if command -v yazi >/dev/null; then
+    y() {
+        local tmp cwd
+        tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
+        command yazi "$@" --cwd-file="$tmp"
+        IFS= read -r -d '' cwd < "$tmp"
+        [[ "$cwd" != "$PWD" && -d "$cwd" ]] && builtin cd -- "$cwd"
+        command rm -f -- "$tmp"
+    }
+fi
+
+#------------------------------------------------------------------------------
+# TEALDEER — `tldr <command>` for community cheat sheets (cache primed at install)
+#------------------------------------------------------------------------------
+# btop, dust, duf, procs, sd, hyperfine, gh need no shell wiring — just use them.
 
 #------------------------------------------------------------------------------
 # NETWORK HELPERS

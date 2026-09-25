@@ -1,0 +1,71 @@
+# ftazsh git defaults.
+#
+# Included from your global git config *before* your own settings, so anything
+# you set with `git config --global` (now or later) overrides what is here.
+# This file is managed by ftazsh (re-installed on update); put your own
+# settings in ~/.gitconfig instead.
+
+[core]
+	# Syntax-highlighted diffs via delta (falls back to less if delta is missing).
+	pager = ~/.config/ftazsh/bin/ftazsh-pager
+	# Faster `git status` on large trees.
+	untrackedCache = true
+
+[interactive]
+	diffFilter = ~/.config/ftazsh/bin/ftazsh-pager --color-only
+
+[delta]
+	navigate = true
+	line-numbers = true
+	hyperlinks = true
+
+[credential]
+	# Homebrew's git does not read Apple's system gitconfig, which is where the
+	# Keychain credential helper is normally configured.
+	helper = osxkeychain
+
+[init]
+	defaultBranch = main
+	# Git 3.0 makes reftable the default ref storage for new repositories.
+	# Opt in early with `ftazsh reftable on` (or uncomment):
+	# defaultRefFormat = reftable
+
+[diff]
+	algorithm = histogram
+	colorMoved = default
+
+[merge]
+	conflictStyle = zdiff3
+
+[rebase]
+	autoSquash = true
+	autoStash = true
+	updateRefs = true
+
+[rerere]
+	enabled = true
+	autoupdate = true
+
+[push]
+	autoSetupRemote = true
+
+[fetch]
+	prune = true
+
+[branch]
+	sort = -committerdate
+
+[tag]
+	sort = version:refname
+
+[column]
+	ui = auto
+
+[commit]
+	verbose = true
+
+[alias]
+	# Structural diffs with difftastic.
+	dft = -c diff.external=difft diff
+	dlog = -c diff.external=difft log -p --ext-diff
+	dshow = -c diff.external=difft show --ext-diff
