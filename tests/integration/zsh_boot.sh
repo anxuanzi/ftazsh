@@ -70,6 +70,7 @@ SCRIPT_DIR="$UPSTREAM"          # install from the working-tree snapshot
 
 create_directories
 install_omz
+migrate_legacy_install
 install_plugin_repos
 install_p10k
 sync_repo

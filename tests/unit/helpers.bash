@@ -158,3 +158,12 @@ make_upstream() {
 commit_upstream() {
     git -C "$1" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "${2:-upstream change}"
 }
+
+# Make DIR look like a git clone of URL (what the old installer left behind).
+# usage: make_fake_clone <dir> <origin-url>
+make_fake_clone() {
+    mkdir -p "$1"
+    git -C "$1" init -q
+    git -C "$1" remote add origin "$2"
+    echo "x" > "$1/file"
+}

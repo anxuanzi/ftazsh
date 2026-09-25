@@ -376,6 +376,13 @@ cmd_doctor() {
     if [[ -d "$REPO/.git" ]]; then
         pass "Managed clone: $(git -C "$REPO" rev-parse --short HEAD) on $(repo_branch) from $(repo_url)"
     fi
+    local legacy=()
+    for f in fzf marker oh-my-zsh/plugins/zsh-autosuggestions oh-my-zsh/custom/plugins/k oh-my-zsh/custom/plugins/zsh-history-substring-search; do
+        [[ -d "$FTAZSH_HOME/$f" ]] && legacy+=("$f")
+    done
+    if [[ "${#legacy[@]}" -gt 0 ]]; then
+        note "Leftovers of an older ftazsh in $FTAZSH_HOME: ${legacy[*]} (run 'ftazsh update' or ./install.sh to clean up)"
+    fi
 
     # --- git config ---------------------------------------------------------
     if git config --global --get-all include.path 2>/dev/null | grep -qxF "$FTAZSH_HOME/gitconfig"; then

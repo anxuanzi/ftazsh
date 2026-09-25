@@ -76,6 +76,17 @@ setup() {
     [ "$(git config --file "$HOME/.config/git/config" --get user.name)" = "Xdg" ]
 }
 
+@test "remove_legacy_leftovers removes the old fzf rc files and the checkout's nerd-fonts clone" {
+    echo 'source "$HOME/.config/ftazsh/fzf/shell/completion.zsh"' > "$HOME/.fzf.zsh"
+    echo 'unrelated' > "$HOME/.fzf.bash"
+    make_fake_clone "$BATS_TEST_TMPDIR/checkout/nerd-fonts" "https://github.com/ryanoasis/nerd-fonts.git"
+    SCRIPT_DIR="$BATS_TEST_TMPDIR/checkout"
+    remove_legacy_leftovers
+    [ ! -e "$HOME/.fzf.zsh" ]
+    [ -e "$HOME/.fzf.bash" ]
+    [ ! -d "$BATS_TEST_TMPDIR/checkout/nerd-fonts" ]
+}
+
 @test "backup_personal_config copies the user's zshrc directory next to the .zshrc backups" {
     mkdir -p "$FTAZSH_HOME/zshrc"
     echo "alias x=y" > "$FTAZSH_HOME/zshrc/mine.zsh"

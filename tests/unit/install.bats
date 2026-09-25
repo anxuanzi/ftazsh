@@ -153,6 +153,43 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
+# ---------- upgrades from older ftazsh versions ----------
+
+@test "migrate_legacy_install removes what the old installer left and nothing else" {
+    create_directories
+    local custom="$FTAZSH_HOME/oh-my-zsh/custom/plugins"
+    make_fake_clone "$custom/k" "https://github.com/supercrabtree/k"
+    make_fake_clone "$custom/zsh-history-substring-search" "https://github.com/zsh-users/zsh-history-substring-search"
+    make_fake_clone "$custom/my-own-plugin" "https://github.com/someone/my-own-plugin"
+    mkdir -p "$custom/hand-copied-k"
+    make_fake_clone "$FTAZSH_HOME/fzf" "https://github.com/junegunn/fzf.git"
+    make_fake_clone "$FTAZSH_HOME/marker" "https://github.com/jotyGill/marker"
+    echo '[[ -f "$HOME/.config/ftazsh/fzf/shell/key-bindings.zsh" ]] && source ...' > "$HOME/.fzf.zsh"
+    echo 'my own fzf setup' > "$HOME/.fzf.bash"
+    mkdir -p "$BATS_TEST_TMPDIR/checkout"
+    make_fake_clone "$BATS_TEST_TMPDIR/checkout/nerd-fonts" "https://github.com/ryanoasis/nerd-fonts.git"
+    SCRIPT_DIR="$BATS_TEST_TMPDIR/checkout"
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"older ftazsh"* ]]
+    [ ! -d "$custom/k" ]
+    [ ! -d "$custom/zsh-history-substring-search" ]
+    [ -d "$custom/my-own-plugin" ]
+    [ -d "$custom/hand-copied-k" ]
+    [ ! -d "$FTAZSH_HOME/fzf" ]
+    [ ! -d "$FTAZSH_HOME/marker" ]
+    [ ! -e "$HOME/.fzf.zsh" ]
+    [ -e "$HOME/.fzf.bash" ]
+    [ ! -d "$BATS_TEST_TMPDIR/checkout/nerd-fonts" ]
+}
+
+@test "migrate_legacy_install is silent on a current layout" {
+    create_directories
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
 # ---------- ftazsh's own clone ----------
 
 @test "sync_repo clones this checkout, points origin at the upstream and records the branch" {

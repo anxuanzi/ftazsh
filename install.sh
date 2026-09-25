@@ -521,6 +521,68 @@ install_p10k() {
 }
 
 #######################################
+# Upgrades from older ftazsh versions
+#######################################
+
+# is_clone_of DIR PATTERN — true when DIR is a git clone whose origin URL
+# contains PATTERN (so only clones the old installer made are ever touched).
+is_clone_of() {
+    local dir="$1" pattern="$2"
+    [[ -d "$dir/.git" ]] || return 1
+    git -C "$dir" remote get-url origin 2>/dev/null | grep -q -- "$pattern"
+}
+
+# Remove what older ftazsh versions installed and this one no longer uses:
+#   * plugin clones under oh-my-zsh/custom: k, zsh-history-substring-search
+#     (oh-my-zsh's built-in history-substring-search is used now)
+#   * ftazsh's own fzf clone and the ~/.fzf.zsh / ~/.fzf.bash it generated
+#     (fzf comes from Homebrew now)
+#   * the marker clone (dropped; upstream is abandoned)
+#   * the multi-gigabyte nerd-fonts clone inside the checkout (fonts come
+#     from Homebrew casks now)
+# The in-tree zsh-autosuggestions clone is handled by install_plugin_repos.
+migrate_legacy_install() {
+    local custom="$FTAZSH_HOME/oh-my-zsh/custom/plugins" f size
+    local removed=()
+    if is_clone_of "$custom/k" "supercrabtree/k"; then
+        rm -rf "$custom/k"
+        removed+=("plugin clone k")
+    fi
+    if is_clone_of "$custom/zsh-history-substring-search" "zsh-users/zsh-history-substring-search"; then
+        rm -rf "$custom/zsh-history-substring-search"
+        removed+=("plugin clone zsh-history-substring-search (oh-my-zsh's built-in one is used)")
+    fi
+    if is_clone_of "$FTAZSH_HOME/fzf" "junegunn/fzf"; then
+        rm -rf "$FTAZSH_HOME/fzf"
+        removed+=("old fzf clone (Homebrew's fzf is used)")
+        for f in "$HOME/.fzf.zsh" "$HOME/.fzf.bash"; do
+            if [[ -f "$f" ]] && grep -q "config/ftazsh/fzf" "$f"; then
+                rm -f "$f"
+                removed+=("${f/#$HOME/~} (pointed at that clone)")
+            fi
+        done
+    fi
+    if is_clone_of "$FTAZSH_HOME/marker" "/marker"; then
+        rm -rf "$FTAZSH_HOME/marker"
+        removed+=("marker clone")
+        if [[ -d "$HOME/.local/share/marker" ]]; then
+            info "marker's own data in ~/.local/share/marker was left alone; delete it if you no longer use marker."
+        fi
+    fi
+    if is_clone_of "$SCRIPT_DIR/nerd-fonts" "ryanoasis/nerd-fonts"; then
+        size="$(du -sh "$SCRIPT_DIR/nerd-fonts" 2>/dev/null | awk '{print $1}')"
+        rm -rf "$SCRIPT_DIR/nerd-fonts"
+        removed+=("nerd-fonts clone in the checkout (${size:-?}; fonts come from Homebrew now)")
+    fi
+    if [[ "${#removed[@]}" -gt 0 ]]; then
+        ok "Cleaned up leftovers of an older ftazsh version:"
+        for f in "${removed[@]}"; do
+            echo "    - $f"
+        done
+    fi
+}
+
+#######################################
 # ftazsh's own clone (self-update source)
 #######################################
 
@@ -735,6 +797,7 @@ main() {
     backup_zshrc
     create_directories
     install_omz
+    migrate_legacy_install
     install_plugin_repos
     install_p10k
     sync_repo

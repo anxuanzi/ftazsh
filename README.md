@@ -129,6 +129,38 @@ render. iTerm2 users can import the bundled profile (font pre-set):
 Font Mono** as the fallback (iTerm2: *Use a different font for non-ASCII
 text*; Kitty, WezTerm and Ghostty pick it up automatically).
 
+## Upgrading from an older ftazsh
+
+Run the installer again from an up-to-date checkout (or use the one-liner
+above):
+
+```bash
+cd ftazsh && git pull && ./install.sh
+```
+
+That is the whole upgrade, whichever version you have:
+
+* **From the August 2026 version** (`~/.config/ftazsh` with `ftazshrc.zsh`
+  and `tools.zsh`): the managed configs are replaced in place, everything in
+  `~/.config/ftazsh/zshrc/` is kept, the new tools and fonts are installed,
+  the git defaults are included, and the managed clone that powers
+  `ftazsh update` is created. From then on updates are automatic.
+* **From the original ftazsh** (the one that cloned the whole nerd-fonts
+  repository): the same, plus your old `~/.zshrc` (which had no
+  ftazsh-managed marker) is backed up, and the leftovers this version no
+  longer uses are removed: the in-tree `zsh-autosuggestions` clone, the `k`
+  and `zsh-history-substring-search` plugin clones, ftazsh's own `fzf` clone
+  and the `~/.fzf.zsh` / `~/.fzf.bash` it generated, the `marker` clone, and
+  the multi-gigabyte `nerd-fonts` clone inside the checkout. Only clones the
+  old installer made are touched; a plugin you put there yourself stays.
+  marker's data in `~/.local/share/marker` is left alone. If one of your own
+  files in `zshrc/` still adds a removed plugin (`k`, `z`, `marker`), remove
+  that line to silence oh-my-zsh's warning.
+
+`ftazsh doctor` points out any leftovers it still sees. Prefer a fresh start?
+`ftazsh reinstall` (or `./uninstall.sh` followed by `./install.sh`) gives you
+a clean install and keeps your `.zshrc` backups and personal files.
+
 ## Keeping it up to date
 
 ```

@@ -178,6 +178,19 @@ online), runs its `uninstall.sh --yes`, then its `install.sh`. `backup_zshrc`
 skips backups identical to the newest one, so uninstall/reinstall cycles don't
 pile up copies.
 
+### Upgrades from older versions
+
+Re-running `install.sh` is the upgrade path for both earlier layouts. The
+August 2026 layout is a strict subset of the new one, so every step is an
+idempotent refresh. For the original ftazsh, `migrate_legacy_install` removes
+what that installer created and nothing else — identified by the origin URL
+of each clone (k, zsh-history-substring-search, fzf, marker, the nerd-fonts
+clone in the checkout) plus the `~/.fzf.zsh`/`~/.fzf.bash` files that point
+at ftazsh's fzf clone; the in-tree zsh-autosuggestions clone was already
+handled. Data outside `~/.config/ftazsh` that a user might still use
+(`~/.local/share/marker`) is reported, not deleted. `uninstall.sh` removes the
+same generated files, and `ftazsh doctor` flags leftovers.
+
 ### Testing
 
 * **Unit (bats, 70 tests):** installer, uninstaller and CLI with stubbed
