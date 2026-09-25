@@ -161,6 +161,8 @@ check "graceful degradation: no MANPAGER when bat is absent" \
 check "graceful degradation: no yazi wrapper / lazygit alias when absent" \
     '{ command -v yazi >/dev/null || ! whence y >/dev/null; } && { command -v lazygit >/dev/null || ! alias lg >/dev/null 2>&1; }'
 check "p10k prompt engine loaded" '[[ "$(whence -w p10k)" == *function* ]]'
+check "exported POWERLEVEL9K_* overrides survive p10k.zsh (CI/test hermeticity)" \
+    '[[ "$POWERLEVEL9K_DISABLE_GITSTATUS" == true && "$POWERLEVEL9K_INSTANT_PROMPT" == off ]]'
 check "history sized up" '[[ "$HISTSIZE" -ge 50000 && "$SAVEHIST" -ge 50000 ]]'
 check "settings.zsh is sourced (update mode/frequency visible)" \
     '[[ "$FTAZSH_UPDATE_MODE" == prompt && "$FTAZSH_UPDATE_FREQUENCY_DAYS" == 7 ]]'

@@ -27,7 +27,18 @@ fi
 source "$FTAZSH_HOME/ftazshrc.zsh"
 
 # Prompt configuration — edit ~/.config/ftazsh/p10k.zsh or run `p10k configure`.
+# POWERLEVEL9K_* variables exported in the environment (CI, tests, ssh) must
+# win over the config file, which starts by unsetting every POWERLEVEL9K_*
+# parameter — so they are saved first and restored afterwards.
+typeset -A _ftazsh_p9k_env
+for _ftazsh_v in ${(k)parameters[(I)POWERLEVEL9K_*]}; do
+  [[ ${parameters[$_ftazsh_v]} == *export* ]] && _ftazsh_p9k_env[$_ftazsh_v]=${(P)_ftazsh_v}
+done
 [[ ! -f "$FTAZSH_HOME/p10k.zsh" ]] || source "$FTAZSH_HOME/p10k.zsh"
+for _ftazsh_v in ${(k)_ftazsh_p9k_env}; do
+  typeset -gx "$_ftazsh_v"="$_ftazsh_p9k_env[$_ftazsh_v]"
+done
+unset _ftazsh_v _ftazsh_p9k_env
 
 # Your personal configuration: every file in ~/.config/ftazsh/zshrc/ is
 # sourced in name order. ftazsh never modifies files in that directory.

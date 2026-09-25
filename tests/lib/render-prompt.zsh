@@ -15,13 +15,18 @@ export TERM=${TERM:-xterm-256color} COLUMNS=200 LINES=50
 
 zpty -b p zsh -i || { print -u2 "render-prompt: cannot start zsh"; exit 2 }
 zpty -w p "stty cols 200 rows 50 2>/dev/null; cd ${(q)dir}"
-zpty -w p "sleep $settle"          # async segments arrive; the next prompt shows them
+# Async segments (gitstatusd) arrive later; render a prompt every quarter
+# second for SETTLE_SECONDS so the output contains one that has them.
+integer i n=$(( settle * 4 ))
+(( n < 1 )) && n=1
+for (( i = 0; i < n; i++ )); do
+  zpty -w p "sleep 0.25"
+done
 zpty -w p "${extra:-true}"
 zpty -w p "exit"
 
 local buf='' chunk
-integer i
-for (( i = 0; i < 600; i++ )); do        # up to 60 s
+for (( i = 0; i < 900; i++ )); do        # up to 90 s
   if zpty -r p chunk; then
     buf+=$chunk
     continue
