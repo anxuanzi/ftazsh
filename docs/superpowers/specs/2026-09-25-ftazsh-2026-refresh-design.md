@@ -52,6 +52,21 @@ to their replacements — scripts and muscle memory keep working; the new tools
 are used by their own names. Shell wiring only where it adds value (`lg`,
 `y`, `tree`, fzf previews, delta/difftastic through git config).
 
+### Fonts
+
+Twelve families via Homebrew casks, per user into `~/Library/Fonts` (system-wide
+`/Library/Fonts` would need admin rights and is not what Homebrew does).
+`FONT_SPECS` holds `cask|representative file|nerd-fonts zip` per family: seven
+Nerd Fonts (JetBrains Mono, Hack, Meslo LGS — p10k's recommendation — Fira
+Code, Caskaydia Cove, Sauce Code Pro, Symbols Only) and the five plain editor
+versions. Homebrew's exit status is the primary signal; the representative
+file is a self-check (reinstall when a listed cask's files are gone; a warning,
+never a failure, when a file name changed upstream). A Nerd Font whose cask
+fails is fetched from `releases/latest/download/<Family>.zip` of ryanoasis/
+nerd-fonts (all seven verified to exist); only when that fails too does the
+installer stop. Plain fonts are best effort. `ftazsh doctor`, the smoke test
+and the macOS CI job check every family.
+
 ### Homebrew hardening
 
 `HOMEBREW_NO_ASK=1`, `HOMEBREW_NO_ENV_HINTS=1`, `HOMEBREW_NO_AUTO_UPDATE=1`

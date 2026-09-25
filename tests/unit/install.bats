@@ -308,61 +308,90 @@ setup() {
     [[ "$output" == *eza* ]]
 }
 
-@test "install_brew_casks installs both font casks" {
+@test "install_brew_casks installs every font family" {
     export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts"
     run install_brew_casks
     [ "$status" -eq 0 ]
+    run grep -c "^brew install --cask" "$STUB_LOG"
+    [ "$output" -eq "${#CASKS[@]}" ]
     grep -q "^brew install --cask font-jetbrains-mono-nerd-font" "$STUB_LOG"
-    grep -q "^brew install --cask font-hack-nerd-font" "$STUB_LOG"
+    grep -q "^brew install --cask font-meslo-lg-nerd-font" "$STUB_LOG"
+    grep -q "^brew install --cask font-symbols-only-nerd-font" "$STUB_LOG"
+    grep -q "^brew install --cask font-fira-code$" "$STUB_LOG"
 }
 
 @test "install_brew_casks reinstalls a listed cask whose font files are missing" {
-    export BREW_INSTALLED_CASKS="font-jetbrains-mono-nerd-font font-hack-nerd-font"
+    export BREW_INSTALLED_CASKS="${CASKS[*]}"
     export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts"
-    mkdir -p "$FTAZSH_FONT_DIR"
-    touch "$FTAZSH_FONT_DIR/HackNerdFont-Regular.ttf"
+    make_installed_fonts
+    rm "$FTAZSH_FONT_DIR/JetBrainsMonoNerdFont-Regular.ttf"
     run install_brew_casks
     [ "$status" -eq 0 ]
     grep -q "^brew reinstall --cask font-jetbrains-mono-nerd-font" "$STUB_LOG"
-    ! grep -q "^brew reinstall --cask font-hack-nerd-font" "$STUB_LOG"
+    [ "$(grep -c "^brew reinstall" "$STUB_LOG")" -eq 1 ]
+    ! grep -q "^brew install --cask" "$STUB_LOG"
 }
 
-@test "install_brew_casks skips casks that are installed with their files present" {
-    export BREW_INSTALLED_CASKS="font-jetbrains-mono-nerd-font font-hack-nerd-font"
+@test "install_brew_casks skips families that are installed with their files present" {
+    export BREW_INSTALLED_CASKS="${CASKS[*]}"
     export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts"
-    mkdir -p "$FTAZSH_FONT_DIR"
-    touch "$FTAZSH_FONT_DIR/JetBrainsMonoNerdFont-Regular.ttf" "$FTAZSH_FONT_DIR/HackNerdFont-Regular.ttf"
+    make_installed_fonts
     run install_brew_casks
     [ "$status" -eq 0 ]
     ! grep -q "install --cask" "$STUB_LOG"
+    [[ "$output" == *"${#CASKS[@]} of ${#CASKS[@]} families"* ]]
 }
 
-@test "JBM cask failure falls back to direct download and installs TTFs" {
+@test "a Nerd Font cask failure falls back to the nerd-fonts release download" {
     export BREW_FAIL_ON="font-jetbrains-mono-nerd-font"
-    make_fixture_font_zip "$BATS_TEST_TMPDIR/jbm.zip"
-    export FTAZSH_JBM_FONT_URL="file://$BATS_TEST_TMPDIR/jbm.zip"
+    mkdir -p "$BATS_TEST_TMPDIR/nerd"
+    make_fixture_font_zip "$BATS_TEST_TMPDIR/nerd/JetBrainsMono.zip"
+    export FTAZSH_NERD_FONT_BASE_URL="file://$BATS_TEST_TMPDIR/nerd"
     export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts-dest"
     run install_brew_casks
     [ "$status" -eq 0 ]
     [ -f "$FTAZSH_FONT_DIR/JetBrainsMonoNerdFont-ExtraBold.ttf" ]
     [ -f "$FTAZSH_FONT_DIR/JetBrainsMonoNerdFont-Regular.ttf" ]
+    [[ "$output" == *"installed from the nerd-fonts release"* ]]
 }
 
-@test "JBM cask failure with a broken download URL fails and names the font" {
-    export BREW_FAIL_ON="font-jetbrains-mono-nerd-font"
-    export FTAZSH_JBM_FONT_URL="file://$BATS_TEST_TMPDIR/nonexistent.zip"
-    export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts-dest"
-    run install_brew_casks
-    [ "$status" -ne 0 ]
-    [[ "$output" == *font-jetbrains-mono-nerd-font* ]]
-}
-
-@test "hack cask failure does not trigger the JBM fallback" {
+@test "every Nerd Font family has a working release fallback (Hack, Meslo, Symbols)" {
     export BREW_FAIL_ON="font-hack-nerd-font"
+    mkdir -p "$BATS_TEST_TMPDIR/nerd"
+    make_fixture_font_zip "$BATS_TEST_TMPDIR/nerd/Hack.zip" HackNerdFont-Regular.ttf HackNerdFont-Bold.ttf
+    export FTAZSH_NERD_FONT_BASE_URL="file://$BATS_TEST_TMPDIR/nerd"
+    export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts-dest"
+    run install_brew_casks
+    [ "$status" -eq 0 ]
+    [ -f "$FTAZSH_FONT_DIR/HackNerdFont-Regular.ttf" ]
+    [ "$(cask_nerd_zip font-meslo-lg-nerd-font)" = "Meslo.zip" ]
+    [ "$(cask_nerd_zip font-symbols-only-nerd-font)" = "NerdFontsSymbolsOnly.zip" ]
+    [ -z "$(cask_nerd_zip font-fira-code)" ]
+}
+
+@test "a Nerd Font whose cask and download both fail makes the installer fail and names it" {
+    export BREW_FAIL_ON="font-jetbrains-mono-nerd-font"
+    export FTAZSH_NERD_FONT_BASE_URL="file://$BATS_TEST_TMPDIR/nonexistent"
     export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts-dest"
     run install_brew_casks
     [ "$status" -ne 0 ]
-    [ ! -d "$FTAZSH_FONT_DIR" ]
+    [[ "$output" == *"Failed to install Nerd Fonts"*font-jetbrains-mono-nerd-font* ]]
+}
+
+@test "a plain (non-Nerd) font cask failure is a warning, not an error" {
+    export BREW_FAIL_ON="font-fira-code"
+    export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts-dest"
+    run install_brew_casks
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Optional (non-Nerd) fonts not installed: font-fira-code"* ]]
+    ! grep -q "nerd-fonts release" <<< "$output"
+}
+
+@test "install_brew_casks warns about families whose file is missing after a successful install" {
+    export FTAZSH_FONT_DIR="$BATS_TEST_TMPDIR/fonts-dest"
+    run install_brew_casks
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"expected file was not found"* ]]
 }
 
 @test "upgrade_brew_tools upgrades only outdated managed tools, and only with --upgrade" {

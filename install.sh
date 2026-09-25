@@ -53,14 +53,33 @@ FORMULAE=(
     tealdeer        # tldr pages
     yazi            # terminal file manager (y)
 )
-# Nerd Fonts (v3 naming). JetBrains Mono is used by the bundled iTerm2 profile.
-JBM_CASK="font-jetbrains-mono-nerd-font"
-CASKS=("$JBM_CASK" font-hack-nerd-font)
-# One file per cask that must exist in the font directory for the cask to count
-# as really installed (Homebrew may list a cask whose files are gone).
-JBM_FONT_FILE="JetBrainsMonoNerdFont-Regular.ttf"
-HACK_FONT_FILE="HackNerdFont-Regular.ttf"
-JBM_FONT_URL_DEFAULT="https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"
+# Fonts, installed per user into ~/Library/Fonts by Homebrew casks (Nerd Fonts
+# v3 naming). Each entry is  cask|representative file|nerd-fonts release zip.
+# The Nerd Font families (patched with the icons the prompt uses) have a
+# fallback: if the cask fails, the family is downloaded straight from the
+# official nerd-fonts release. The plain (unpatched) families are best effort.
+# The representative file is what the installer and `ftazsh doctor` look for
+# to tell whether a family is really present.
+FONT_SPECS=(
+    "font-jetbrains-mono-nerd-font|JetBrainsMonoNerdFont-Regular.ttf|JetBrainsMono.zip"  # used by the iTerm2 profile
+    "font-hack-nerd-font|HackNerdFont-Regular.ttf|Hack.zip"
+    "font-meslo-lg-nerd-font|MesloLGSNerdFont-Regular.ttf|Meslo.zip"                     # Powerlevel10k's recommended family
+    "font-fira-code-nerd-font|FiraCodeNerdFont-Regular.ttf|FiraCode.zip"
+    "font-caskaydia-cove-nerd-font|CaskaydiaCoveNerdFont-Regular.ttf|CascadiaCode.zip"   # Cascadia Code
+    "font-sauce-code-pro-nerd-font|SauceCodeProNerdFont-Regular.ttf|SourceCodePro.zip"   # Source Code Pro
+    "font-symbols-only-nerd-font|SymbolsNerdFont-Regular.ttf|NerdFontsSymbolsOnly.zip"   # icon fallback for any other font
+    "font-jetbrains-mono|JetBrainsMono-Regular.ttf|"
+    "font-fira-code|FiraCode-Regular.ttf|"
+    "font-cascadia-code|CascadiaCode.ttf|"
+    "font-source-code-pro|SourceCodePro[wght].ttf|"
+    "font-hack|Hack-Regular.ttf|"
+)
+CASKS=()
+for _spec in "${FONT_SPECS[@]}"; do
+    CASKS+=("${_spec%%|*}")
+done
+unset _spec
+NERD_FONT_BASE_URL_DEFAULT="https://github.com/ryanoasis/nerd-fonts/releases/latest/download"
 
 # Default sources. Each is overridable at call time via FTAZSH_* environment
 # variables (tests point them at local fixtures; see the *_url/file helpers).
@@ -97,7 +116,7 @@ err()  { printf '❌  %s\n' "$*" >&2; }
 omz_repo()        { printf '%s' "${FTAZSH_OMZ_REPO:-$OMZ_REPO_DEFAULT}"; }
 p10k_repo()       { printf '%s' "${FTAZSH_P10K_REPO:-$P10K_REPO_DEFAULT}"; }
 plugin_base_url() { printf '%s' "${FTAZSH_PLUGIN_BASE_URL:-$PLUGIN_BASE_URL_DEFAULT}"; }
-jbm_font_url()    { printf '%s' "${FTAZSH_JBM_FONT_URL:-$JBM_FONT_URL_DEFAULT}"; }
+nerd_font_url()   { printf '%s/%s' "${FTAZSH_NERD_FONT_BASE_URL:-$NERD_FONT_BASE_URL_DEFAULT}" "$1"; }
 font_dir()        { printf '%s' "${FTAZSH_FONT_DIR:-$HOME/Library/Fonts}"; }
 shells_file()     { printf '%s' "${FTAZSH_SHELLS_FILE:-/etc/shells}"; }
 
@@ -248,67 +267,114 @@ install_brew_formulae() {
     fi
 }
 
-# The font file that proves a cask is really installed, or "" if none.
+# cask_font_file CASK → the file that proves the family is installed ("" if unknown).
 cask_font_file() {
-    case "$1" in
-        "$JBM_CASK")         printf '%s' "$JBM_FONT_FILE" ;;
-        font-hack-nerd-font) printf '%s' "$HACK_FONT_FILE" ;;
-        *)                   printf '' ;;
-    esac
+    local spec rest
+    for spec in "${FONT_SPECS[@]}"; do
+        if [[ "${spec%%|*}" == "$1" ]]; then
+            rest="${spec#*|}"
+            printf '%s' "${rest%%|*}"
+            return 0
+        fi
+    done
+    printf ''
+}
+
+# cask_nerd_zip CASK → the nerd-fonts release zip of the family ("" for plain fonts).
+cask_nerd_zip() {
+    local spec
+    for spec in "${FONT_SPECS[@]}"; do
+        if [[ "${spec%%|*}" == "$1" ]]; then
+            printf '%s' "${spec##*|}"
+            return 0
+        fi
+    done
+    printf ''
+}
+
+# in_list NEEDLE ITEM... → true when NEEDLE is one of the ITEMs.
+in_list() {
+    local needle="$1" item
+    shift
+    for item in "$@"; do
+        [[ "$item" == "$needle" ]] && return 0
+    done
+    return 1
 }
 
 install_brew_casks() {
-    info "Installing Nerd Fonts: ${CASKS[*]}"
-    local installed c font
-    local failed=()
+    info "Installing fonts (${#CASKS[@]} families): ${CASKS[*]}"
+    local installed c file zip dest
+    local failed_nerd=() failed_plain=() unverified=()
     installed="$(brew list --cask 2>/dev/null || true)"
+    dest="$(font_dir)"
     for c in "${CASKS[@]}"; do
-        font="$(cask_font_file "$c")"
+        file="$(cask_font_file "$c")"
+        zip="$(cask_nerd_zip "$c")"
         if printf '%s\n' "$installed" | grep -qx "$c"; then
-            if [[ -n "$font" && ! -f "$(font_dir)/$font" ]]; then
+            if [[ -n "$file" && ! -f "$dest/$file" ]]; then
                 warn "$c is listed by Homebrew but its font files are missing; reinstalling."
                 if brew reinstall --cask "$c"; then
                     ok "$c reinstalled"
-                elif [[ "$c" == "$JBM_CASK" ]] && install_jbm_font_direct; then
+                elif [[ -n "$zip" ]] && install_nerd_font_direct "$zip" "$c"; then
                     :
+                elif [[ -n "$zip" ]]; then
+                    failed_nerd+=("$c")
                 else
-                    failed+=("$c")
+                    failed_plain+=("$c")
                 fi
             else
                 ok "$c already installed"
             fi
         elif brew install --cask "$c"; then
             ok "$c installed"
-        elif [[ "$c" == "$JBM_CASK" ]] && install_jbm_font_direct; then
+        elif [[ -n "$zip" ]] && install_nerd_font_direct "$zip" "$c"; then
             :  # cask failed but the direct download covered it
+        elif [[ -n "$zip" ]]; then
+            failed_nerd+=("$c")
         else
-            failed+=("$c")
+            failed_plain+=("$c")
         fi
     done
-    if [[ "${#failed[@]}" -gt 0 ]]; then
-        err "Failed to install fonts: ${failed[*]}"
+
+    # Self-check: every family's representative file should now be present.
+    for c in "${CASKS[@]}"; do
+        file="$(cask_font_file "$c")"
+        [[ -n "$file" && ! -f "$dest/$file" ]] || continue
+        in_list "$c" ${failed_nerd[@]+"${failed_nerd[@]}"} ${failed_plain[@]+"${failed_plain[@]}"} && continue
+        unverified+=("$c")
+    done
+    if [[ "${#unverified[@]}" -gt 0 ]]; then
+        warn "Installed, but the expected file was not found in ${dest/#$HOME/~}: ${unverified[*]} (a font file may have been renamed upstream; 'ftazsh doctor' shows the details)."
+    fi
+    if [[ "${#failed_plain[@]}" -gt 0 ]]; then
+        warn "Optional (non-Nerd) fonts not installed: ${failed_plain[*]} — the Nerd Font versions cover the terminal; retry with: brew install --cask ${failed_plain[*]}"
+    fi
+    if [[ "${#failed_nerd[@]}" -gt 0 ]]; then
+        err "Failed to install Nerd Fonts (cask and direct download both failed): ${failed_nerd[*]}"
         return 1
     fi
+    ok "Fonts ready in ${dest/#$HOME/~}: $(( ${#CASKS[@]} - ${#failed_plain[@]} )) of ${#CASKS[@]} families"
 }
 
-# Fallback when the Homebrew cask is unavailable: fetch the official
-# nerd-fonts release archive and install the TTFs into ~/Library/Fonts
-# (per-user font install; no sudo required).
-install_jbm_font_direct() {
-    info "Cask unavailable — downloading JetBrains Mono Nerd Font directly..."
-    local tmp dest
+# Fallback when a Nerd Font cask is unavailable: fetch the family's archive
+# from the official nerd-fonts release and install the TTFs into
+# ~/Library/Fonts (per-user font install; no sudo required).
+install_nerd_font_direct() {
+    local zip="$1" cask="$2" tmp dest
+    info "Cask $cask unavailable — downloading $zip from the official nerd-fonts release..."
     tmp="$(mktemp -d)"
     dest="$(font_dir)"
-    if curl -fsSL -o "$tmp/JetBrainsMono.zip" "$(jbm_font_url)" \
-        && unzip -oq "$tmp/JetBrainsMono.zip" '*.ttf' -d "$tmp/fonts" \
+    if curl -fsSL -o "$tmp/$zip" "$(nerd_font_url "$zip")" \
+        && unzip -oq "$tmp/$zip" '*.ttf' -d "$tmp/fonts" \
         && mkdir -p "$dest" \
         && cp "$tmp/fonts/"*.ttf "$dest/"; then
         rm -rf "$tmp"
-        ok "JetBrains Mono Nerd Font installed into $dest"
+        ok "$cask installed from the nerd-fonts release into $dest"
         return 0
     fi
     rm -rf "$tmp"
-    err "Direct font download failed."
+    err "Direct download of $zip failed."
     return 1
 }
 
@@ -649,7 +715,7 @@ print_summary() {
     ok "ftazsh is installed! 🎉"
     info "Next steps:"
     echo "    1. Open a new terminal window (or run: exec zsh)"
-    echo "    2. Set your terminal font to 'JetBrainsMono Nerd Font' or 'Hack Nerd Font'"
+    echo "    2. Set your terminal font to a Nerd Font, e.g. 'JetBrainsMono Nerd Font' or 'MesloLGS Nerd Font'"
     echo "    3. iTerm2: import iterm2-profile.json (Settings → Profiles → Other Actions → Import JSON)"
     echo "    4. Tune the prompt anytime with: p10k configure"
     echo "    5. Put personal config in ~/.config/ftazsh/zshrc/ — ftazsh never touches that folder"

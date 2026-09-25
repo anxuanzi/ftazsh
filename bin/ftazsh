@@ -320,7 +320,27 @@ cmd_doctor() {
             fail "Missing tools: ${missing[*]} (run ./install.sh or 'ftazsh update')"
         fi
         local fdir="${FTAZSH_FONT_DIR:-$HOME/Library/Fonts}"
-        if [[ -f "$fdir/${JBM_FONT_FILE:-JetBrainsMonoNerdFont-Regular.ttf}" && -f "$fdir/${HACK_FONT_FILE:-HackNerdFont-Regular.ttf}" ]]; then
+        if [[ -n "${CASKS+x}" ]] && type cask_font_file >/dev/null 2>&1; then
+            local c fnt missing_nerd=() missing_plain=()
+            for c in "${CASKS[@]}"; do
+                fnt="$(cask_font_file "$c")"
+                [[ -n "$fnt" && ! -f "$fdir/$fnt" ]] || continue
+                if [[ -n "$(cask_nerd_zip "$c")" ]]; then
+                    missing_nerd+=("$c")
+                else
+                    missing_plain+=("$c")
+                fi
+            done
+            if [[ "${#missing_nerd[@]}" -eq 0 && "${#missing_plain[@]}" -eq 0 ]]; then
+                pass "All ${#CASKS[@]} font families installed in $fdir"
+            fi
+            if [[ "${#missing_nerd[@]}" -gt 0 ]]; then
+                fail "Nerd Fonts missing in $fdir: ${missing_nerd[*]} (run ./install.sh)"
+            fi
+            if [[ "${#missing_plain[@]}" -gt 0 ]]; then
+                note "Optional fonts missing in $fdir: ${missing_plain[*]} (brew install --cask ${missing_plain[*]})"
+            fi
+        elif [[ -f "$fdir/JetBrainsMonoNerdFont-Regular.ttf" && -f "$fdir/HackNerdFont-Regular.ttf" ]]; then
             pass "Nerd Fonts installed in $fdir"
         else
             fail "Nerd Font files missing in $fdir (run ./install.sh)"

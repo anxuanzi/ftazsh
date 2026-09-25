@@ -169,6 +169,20 @@ check() {
 # zshi CODE — run CODE in an interactive ftazsh shell (booted from the sandbox HOME).
 zshi() { zsh -i -c "$1"; }
 
+# Every managed font family must have its representative file in the font dir.
+fonts_ok() {
+    local c f missing=()
+    for c in "${CASKS[@]}"; do
+        f="$(cask_font_file "$c")"
+        [[ -f "$FTAZSH_FONT_DIR/$f" ]] || missing+=("$c")
+    done
+    if [[ "${#missing[@]}" -gt 0 ]]; then
+        echo "missing font families: ${missing[*]}"
+        return 1
+    fi
+    echo "${#CASKS[@]} font families present in $FTAZSH_FONT_DIR"
+}
+
 # `ftazsh doctor` must pass. The one finding tolerated is a login shell that
 # is not zsh: that is a property of the machine (CI runners use bash), not of
 # ftazsh, and the summary line is the second ❌ in that case.
@@ -199,6 +213,7 @@ check "Homebrew git is the default git in ftazsh shells" bash -c "
 check "git >= 2.45 (reftable-capable)" bash -c '
     v=$(zsh -i -c "git --version" | awk "{print \$3}"); echo "git $v"
     case "$v" in 2.4[5-9]*|2.[5-9]*|[3-9].*) ;; *) exit 1;; esac'
+check "all ${#CASKS[@]} font families installed (Nerd Fonts + plain)" fonts_ok
 check "old .zshrc backed up, managed .zshrc installed" bash -c '
     grep -q ftazsh-managed "$HOME/.zshrc" && grep -lq SMOKE_PRE_EXISTING_ZSHRC "$HOME"/.zshrc-backup-*'
 export POWERLEVEL9K_DISABLE_GITSTATUS=true

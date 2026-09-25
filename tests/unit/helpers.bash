@@ -90,13 +90,26 @@ source_installer() {
 }
 
 # Build a zip of fake TTFs, for font-fallback tests (served via file:// URL).
-# usage: make_fixture_font_zip <absolute/path/to/out.zip>
+# usage: make_fixture_font_zip <absolute/path/to/out.zip> [ttf-name...]
 make_fixture_font_zip() {
-    local out="$1" dir
+    local out="$1" dir f
+    shift
     dir="$(mktemp -d "$BATS_TEST_TMPDIR/fontsrc.XXXXXX")"
-    echo "fake font data" > "$dir/JetBrainsMonoNerdFont-Regular.ttf"
-    echo "fake font data" > "$dir/JetBrainsMonoNerdFont-ExtraBold.ttf"
+    [[ $# -gt 0 ]] || set -- JetBrainsMonoNerdFont-Regular.ttf JetBrainsMonoNerdFont-ExtraBold.ttf
+    for f in "$@"; do
+        echo "fake font data" > "$dir/$f"
+    done
     (cd "$dir" && zip -q "$out" ./*.ttf)
+}
+
+# Create the representative font file of every managed family in $FTAZSH_FONT_DIR
+# (what a successful cask install leaves behind).
+make_installed_fonts() {
+    local c
+    mkdir -p "$FTAZSH_FONT_DIR"
+    for c in "${CASKS[@]}"; do
+        touch "$FTAZSH_FONT_DIR/$(cask_font_file "$c")"
+    done
 }
 
 # Build a local git repo fixture that can be cloned via file://

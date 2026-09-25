@@ -52,10 +52,22 @@ Completions for all of them are on `fpath` before oh-my-zsh runs `compinit`.
 * Helpers: `myip`, `cheat <topic>`, `speedtest`, `dadjoke`, `ipgeo [ip]`,
   `l` (classic detailed `ls`), `e` (exit)
 
-**Fonts:** JetBrains Mono Nerd Font and Hack Nerd Font via Homebrew casks —
-no multi-gigabyte font repo clone. If the JetBrains Mono cask ever fails,
-the installer automatically falls back to downloading the official
-nerd-fonts release and installing the TTFs into `~/Library/Fonts`.
+**Fonts:** twelve families, installed per user into `~/Library/Fonts` (where
+macOS looks for a user's fonts; every app sees them, no admin rights needed):
+
+* Nerd Fonts, patched with the icons the prompt uses: **JetBrains Mono**,
+  **Hack**, **Meslo LGS** (Powerlevel10k's recommended font), **Fira Code**,
+  **Caskaydia Cove** (Cascadia Code), **Sauce Code Pro** (Source Code Pro) and
+  **Symbols Only** (icon fallback for any other font).
+* The plain, unpatched versions for editors: JetBrains Mono, Fira Code,
+  Cascadia Code, Source Code Pro, Hack.
+
+Every family comes from a Homebrew cask. If a Nerd Font cask fails, the
+installer downloads that family straight from the official nerd-fonts release
+instead; a cask that Homebrew lists but whose files are gone is reinstalled;
+and after installing, the installer and `ftazsh doctor` check that each
+family's font file is actually present. The plain families are best effort
+(a failure is a warning).
 
 **Self-maintaining:** `ftazsh update` (or the automatic check, see below)
 brings ftazsh, oh-my-zsh, the plugins, Powerlevel10k *and* the Homebrew tools
@@ -92,7 +104,8 @@ The installer:
 1. Installs Homebrew if missing (and adds it to `~/.zprofile`); runs
    `brew update` once
 2. Installs the tools and fonts listed above (skips what's already there;
-   Homebrew 6+ "ask mode" is disabled for the run so nothing blocks)
+   Homebrew 6+ "ask mode" is disabled for the run so nothing blocks; Nerd
+   Fonts fall back to the official release download if a cask fails)
 3. Backs up a pre-existing `~/.zshrc` to `~/.zshrc-backup-<timestamp>`
 4. Clones oh-my-zsh, plugins, and Powerlevel10k under `~/.config/ftazsh/`
 5. Keeps a clone of ftazsh itself in `~/.config/ftazsh/repo` — the source for
@@ -108,10 +121,13 @@ the prompt, and `ftazsh doctor` to check the installation.
 
 ### Terminal font
 
-Set your terminal's font to **JetBrainsMono Nerd Font** or **Hack Nerd
-Font** so prompt icons render. iTerm2 users can import the bundled profile
-(font pre-set): *Settings → Profiles → Other Actions… → Import JSON
-Profiles…* → pick `iterm2-profile.json`.
+Set your terminal's font to one of the Nerd Fonts above (for example
+**JetBrainsMono Nerd Font** or **MesloLGS Nerd Font**) so prompt icons
+render. iTerm2 users can import the bundled profile (font pre-set):
+*Settings → Profiles → Other Actions… → Import JSON Profiles…* → pick
+`iterm2-profile.json`. To keep a font that has no icons, set **Symbols Nerd
+Font Mono** as the fallback (iTerm2: *Use a different font for non-ASCII
+text*; Kitty, WezTerm and Ghostty pick it up automatically).
 
 ## Keeping it up to date
 
@@ -353,6 +369,10 @@ installer prints the exact name when it backs it up.
 * Tools added: delta, difftastic, lazygit, gh, dust, duf, procs, btop, sd,
   hyperfine, tealdeer, yazi (all Homebrew-bottled for macOS 26/27 on Apple
   Silicon). fzf `Ctrl-R` preview toggle, `Alt-C` directory previews, `tree`.
+* Fonts: twelve families instead of two (Meslo LGS, Fira Code, Cascadia,
+  Source Code Pro and the Symbols-only Nerd Fonts, plus the plain editor
+  versions), each Nerd Font with a release-download fallback, and a presence
+  check per family in the installer and in `ftazsh doctor`.
 * Homebrew's git is now guaranteed to be the default `git` (PATH ordering in
   every ftazsh shell), with managed git defaults via a config include that
   your own settings override.

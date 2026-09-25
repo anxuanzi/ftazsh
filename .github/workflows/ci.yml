@@ -76,6 +76,17 @@ jobs:
           done
           exit "$failed"
 
+      - name: All font families are installed
+        run: |
+          source ./install.sh
+          missing=""
+          for c in "${CASKS[@]}"; do
+            f="$(cask_font_file "$c")"
+            [ -f "$HOME/Library/Fonts/$f" ] || missing="$missing $c"
+          done
+          echo "font files in ~/Library/Fonts: $(ls "$HOME/Library/Fonts" | wc -l | tr -d ' ')"
+          [ -z "$missing" ] || { echo "missing:$missing"; exit 1; }
+
       - name: Homebrew's git is the default git in ftazsh shells
         run: |
           want="$(brew --prefix)/bin/git"
