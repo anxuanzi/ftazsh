@@ -11,8 +11,9 @@ alias e='exit'
 
 if command -v eza >/dev/null; then
     # The modern ls. `a` = everything with git status; `aa` = newest first.
-    alias a='eza -la --git --colour-scale=all -g --smart-group --icons=always'
-    alias aa='eza -la --git --colour-scale=all -g --smart-group --icons=always -s modified -r'
+    # (eza >= 0.22 only accepts the American spelling of --color-scale.)
+    alias a='eza -la --git --color-scale=all -g --smart-group --icons=always'
+    alias aa='eza -la --git --color-scale=all -g --smart-group --icons=always -s modified -r'
     # macOS ships no `tree`; eza has one built in.
     command -v tree >/dev/null || alias tree='eza --tree --icons=always --git-ignore'
 fi
@@ -44,7 +45,7 @@ if command -v fzf >/dev/null; then
         export FZF_CTRL_T_OPTS="--preview 'bat --color=always --style=numbers --line-range=:200 {}'"
     fi
     if command -v eza >/dev/null; then
-        export FZF_ALT_C_OPTS="--preview 'eza --tree --level=2 --colour=always --icons=always {} | head -200'"
+        export FZF_ALT_C_OPTS="--preview 'eza --tree --level=2 --color=always --icons=always {} | head -200'"
     fi
 fi
 

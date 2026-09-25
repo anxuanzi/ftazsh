@@ -567,7 +567,7 @@ sync_repo() {
         else
             info "Creating the managed ftazsh clone from this checkout..."
             rm -rf "$repo"
-            git clone --quiet "$SCRIPT_DIR" "$repo"
+            git -c advice.detachedHead=false clone --quiet "$SCRIPT_DIR" "$repo"
             git -C "$repo" checkout --quiet -B "$branch"
         fi
     elif [[ ! -d "$repo/.git" ]]; then
