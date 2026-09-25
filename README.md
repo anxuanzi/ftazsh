@@ -380,7 +380,9 @@ make mac-test                       # bash tests/macos/smoke.sh [--yes] [--keep-
 
 Runs the real installer against a **throwaway HOME** (CI runs exactly this
 script on a macOS runner too): your `~/.zshrc`,
-`~/.gitconfig`, `~/.config/ftazsh`, caches and history are never touched.
+`~/.gitconfig`, `~/.config/ftazsh` and history are never touched. Only two download
+caches are shared with your real HOME so nothing is fetched twice: Homebrew's
+and Powerlevel10k's gitstatusd cache (`~/.cache/gitstatus`).
 Homebrew is machine-wide, so the tools and fonts are installed for real —
 and at the end the script uninstalls exactly those that were not on the
 machine before (unless `--keep-tools`) and deletes the sandbox. In between it

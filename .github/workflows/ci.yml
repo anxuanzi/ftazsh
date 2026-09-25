@@ -140,7 +140,7 @@ jobs:
           git init -q --ref-format=reftable -b rt-branch-9f2c "$d"
           git -C "$d" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
           git -C "$d" rev-parse --show-ref-format | grep -qx reftable
-          out="$(zsh tests/lib/render-prompt.zsh "$d" 5)"
+          out="$(zsh tests/lib/render-prompt.zsh "$d" 120 '' rt-branch-9f2c)"
           printf '%s\n' "$out" | tail -8
           printf '%s\n' "$out" | grep -q 'rt-branch-9f2c'
           if printf '%s\n' "$out" | grep -q '\.invalid'; then echo "prompt showed .invalid"; exit 1; fi

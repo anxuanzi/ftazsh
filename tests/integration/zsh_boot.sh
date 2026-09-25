@@ -246,8 +246,8 @@ if git init -q --ref-format=reftable "$SCRATCH/probe" 2>/dev/null; then
     # Full prompt rendering in a pseudo-terminal. gitstatusd is enabled so the
     # real p10k path (gitstatusd answer → shim → render) is exercised whenever
     # p10k can fetch its binary; without it p10k falls back to vcs_info.
-    RENDER="$(env -u POWERLEVEL9K_DISABLE_GITSTATUS zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 2 \
-        'print GITSTATUS_ACTIVE=$+GITSTATUS_DAEMON_PID_POWERLEVEL9K' 2>/dev/null || true)"
+    RENDER="$(env -u POWERLEVEL9K_DISABLE_GITSTATUS zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 60 \
+        'print GITSTATUS_ACTIVE=$+GITSTATUS_DAEMON_PID_POWERLEVEL9K' rt-branch-9f2c 2>/dev/null || true)"
     printf '%s\n' "$RENDER" | grep -v GITSTATUS_ACTIVE | tail -3 | sed 's/^/    prompt: /'
     if printf '%s\n' "$RENDER" | grep -q 'GITSTATUS_ACTIVE=1'; then
         echo "    (gitstatusd was running: the real p10k path went through the shim)"
@@ -259,7 +259,7 @@ if git init -q --ref-format=reftable "$SCRATCH/probe" 2>/dev/null; then
     FR="$SCRATCH/files-repo"
     git init -q --ref-format=files -b files-branch-4b1d "$FR"
     git -C "$FR" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
-    RENDER2="$(env -u POWERLEVEL9K_DISABLE_GITSTATUS zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$FR" 2 2>/dev/null || true)"
+    RENDER2="$(env -u POWERLEVEL9K_DISABLE_GITSTATUS zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$FR" 60 '' files-branch-4b1d 2>/dev/null || true)"
     check_bash "prompt still shows the branch of a classic (files) repo" 'printf "%s\n" "$1" | grep -q files-branch-4b1d' "$RENDER2"
     check "ftazsh reftable status / migrate work" \
         "ftazsh reftable status '$FR' | grep -q 'This repository:  files' && ftazsh reftable migrate '$FR' --yes && git -C '$FR' rev-parse --show-ref-format | grep -qx reftable"

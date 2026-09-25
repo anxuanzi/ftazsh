@@ -6,7 +6,9 @@
 #
 # What it does
 #   * Creates a throwaway HOME, so your ~/.zshrc, ~/.gitconfig,
-#     ~/.config/ftazsh, caches and shell history are never touched.
+#     ~/.config/ftazsh and shell history are never touched. Only two download
+#     caches are shared with your real HOME so nothing is fetched twice:
+#     Homebrew's and Powerlevel10k's gitstatusd cache (~/.cache/gitstatus).
 #   * Runs the real installer against it. Homebrew is machine-wide, so the
 #     tools and fonts ARE installed for real (they are what you'd get anyway).
 #   * Verifies: clean shell boot, tools on PATH, Homebrew's git is the default
@@ -135,6 +137,9 @@ export HOME="$SANDBOX"
 export HOMEBREW_CACHE="$REAL_HOME/Library/Caches/Homebrew"
 export HOMEBREW_CASK_OPTS="--fontdir=$REAL_HOME/Library/Fonts"
 export FTAZSH_FONT_DIR="$REAL_HOME/Library/Fonts"
+# Powerlevel10k downloads gitstatusd on the first prompt; share the standard
+# cache so re-runs (and a Mac that already runs p10k) don't fetch it again.
+export GITSTATUS_CACHE_DIR="${GITSTATUS_CACHE_DIR:-${XDG_CACHE_HOME:-$REAL_HOME/.cache}/gitstatus}"
 # Hermetic prompt boots for the checks (the reftable render check enables gitstatus).
 export POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
 export POWERLEVEL9K_INSTANT_PROMPT=off
@@ -245,15 +250,15 @@ git init -q --ref-format=reftable -b rt-branch-9f2c "$RT"
 git -C "$RT" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
 check "reftable repo created" bash -c "git -C '$RT' rev-parse --show-ref-format | grep -qx reftable"
 unset POWERLEVEL9K_DISABLE_GITSTATUS
-info "(first prompt may download gitstatusd; this takes a moment)"
-RENDER="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 2 || true)"
+info "(Powerlevel10k fetches gitstatusd on the first prompt unless cached; waiting up to 2 minutes)"
+RENDER="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 120 '' rt-branch-9f2c || true)"
 printf '%s\n' "$RENDER" | tail -6 | sed 's/^/    /'
 check "prompt shows the reftable branch" bash -c "printf '%s\n' \"\$1\" | grep -q rt-branch-9f2c" _ "$RENDER"
 check "prompt does not show '.invalid'" bash -c "! printf '%s\n' \"\$1\" | grep -q '\\.invalid'" _ "$RENDER"
 FR="$SANDBOX/files-repo"
 git init -q --ref-format=files -b files-branch-4b1d "$FR"
 git -C "$FR" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
-RENDER2="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$FR" 2 || true)"
+RENDER2="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$FR" 60 '' files-branch-4b1d || true)"
 check "prompt still shows the branch of a classic (files) repo" bash -c "printf '%s\n' \"\$1\" | grep -q files-branch-4b1d" _ "$RENDER2"
 check "ftazsh reftable migrate converts a files repo" bash -c "
     cd '$FR' && zsh -i -c 'ftazsh reftable migrate --yes' && git rev-parse --show-ref-format | grep -qx reftable"
