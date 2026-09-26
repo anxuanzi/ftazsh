@@ -17,15 +17,20 @@ if [[ -z "$HOMEBREW_PREFIX" ]]; then
     done
     unset _ftazsh_brew
 fi
-typeset -U path fpath
+# No duplicate entries — on the scalars too: tools assign to PATH directly
+# (`brew shellenv` does) and only the interfaces carrying the flag deduplicate.
+typeset -U PATH path FPATH fpath
 if [[ -n "$HOMEBREW_PREFIX" ]]; then
     path=("$HOMEBREW_PREFIX/bin" "$HOMEBREW_PREFIX/sbin" $path)
     # Completions for Homebrew-installed tools (gh, eza, fd, rg, delta, …).
-    # Must be on fpath before oh-my-zsh runs compinit. Appended, not
-    # prepended, so zsh's own `_git` (which oh-my-zsh's git plugin builds
-    # on) keeps precedence over git's bundled completion script.
-    [[ ! -d "$HOMEBREW_PREFIX/share/zsh/site-functions" ]] \
-        || fpath+=("$HOMEBREW_PREFIX/share/zsh/site-functions")
+    # Must be on fpath before oh-my-zsh runs compinit — and LAST, wherever
+    # `brew shellenv` (~/.zprofile) had put it: zsh's own `_git`, which
+    # oh-my-zsh's git plugin builds on, must win over git's bundled script.
+    _ftazsh_site_functions="$HOMEBREW_PREFIX/share/zsh/site-functions"
+    if [[ -d "$_ftazsh_site_functions" ]]; then
+        fpath=(${fpath:#$_ftazsh_site_functions} "$_ftazsh_site_functions")
+    fi
+    unset _ftazsh_site_functions
 fi
 
 # The `ftazsh` command (update, doctor, reinstall, …).

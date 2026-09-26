@@ -22,6 +22,24 @@ setup() {
     [ "$output" = "new backup" ]
 }
 
+@test "restore_zshrc ignores backups of ftazsh's own .zshrc and restores the user's" {
+    echo "# ftazsh-managed" > "$HOME/.zshrc"
+    echo "user stuff" > "$HOME/.zshrc-backup-2025-01-01-000000"
+    touch -t 202501010000 "$HOME/.zshrc-backup-2025-01-01-000000"
+    printf '# ftazsh-managed\nexport APPENDED_BY_A_TOOL=1\n' > "$HOME/.zshrc-backup-2025-06-01-000000"
+    touch -t 202506010000 "$HOME/.zshrc-backup-2025-06-01-000000"
+    mkdir -p "$HOME/.zshrc-backup-2025-07-01-000000-ftazsh-personal"
+    restore_zshrc
+    [ "$(cat "$HOME/.zshrc")" = "user stuff" ]
+}
+
+@test "restore_zshrc removes a managed zshrc when only backups of ftazsh's own file exist" {
+    echo "# ftazsh-managed" > "$HOME/.zshrc"
+    printf '# ftazsh-managed\nexport APPENDED_BY_A_TOOL=1\n' > "$HOME/.zshrc-backup-2025-06-01-000000"
+    restore_zshrc
+    [ ! -e "$HOME/.zshrc" ]
+}
+
 @test "restore_zshrc removes a managed zshrc when no backup exists" {
     echo "# ftazsh-managed" > "$HOME/.zshrc"
     restore_zshrc

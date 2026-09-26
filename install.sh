@@ -423,13 +423,51 @@ prime_tools() {
 # Filesystem layout and configuration
 #######################################
 
+# The copy of ~/.zshrc exactly as ftazsh last installed it.
+installed_zshrc_copy() { printf '%s' "$FTAZSH_HOME/state/zshrc.installed"; }
+
+# Lines that other tools appended to the managed ~/.zshrc (nvm, conda, bun
+# and friends do this) are moved to a personal file, which ftazsh never
+# touches and every shell sources. A block already carried over is skipped.
+carry_over_zshrc_additions() {
+    local zshrc="$1" installed="$2" extra="$FTAZSH_HOME/zshrc/zshrc-additions.zsh"
+    local size block sum
+    size=$(( $(wc -c < "$installed") ))
+    block="$(tail -c +"$(( size + 1 ))" "$zshrc")"
+    [[ -n "${block//[[:space:]]/}" ]] || return 0
+    sum="$(printf '%s\n' "$block" | cksum | awk '{print $1}')"
+    if [[ -f "$extra" ]] && grep -qF "# ftazsh-carried: $sum" "$extra"; then
+        return 0
+    fi
+    mkdir -p "$FTAZSH_HOME/zshrc"
+    {
+        printf '\n# Lines other tools had appended to ~/.zshrc, moved here by ftazsh on %s.\n' "$(date +%Y-%m-%d)"
+        printf '# ftazsh-carried: %s\n' "$sum"
+        printf '%s\n' "$block"
+    } >> "$extra"
+    ok "Moved the lines other tools had appended to ~/.zshrc into ~/.config/ftazsh/zshrc/zshrc-additions.zsh (they keep working from there)"
+}
+
 backup_zshrc() {
     local zshrc="$HOME/.zshrc"
     [[ -f "$zshrc" ]] || return 0
 
     if grep -q "ftazsh-managed" "$zshrc"; then
-        info "Existing ~/.zshrc is ftazsh-managed; no backup needed."
-        return 0
+        local installed
+        installed="$(installed_zshrc_copy)"
+        if [[ -f "$installed" ]] && cmp -s "$installed" "$zshrc"; then
+            return 0                              # exactly as ftazsh installed it
+        fi
+        if [[ ! -f "$installed" ]] && cmp -s "$SCRIPT_DIR/.zshrc" "$zshrc"; then
+            return 0                              # already this version's file
+        fi
+        # Changed since ftazsh wrote it: keep a backup, and rescue what tools
+        # appended after ftazsh's own content.
+        if [[ -f "$installed" ]] && head -c "$(( $(wc -c < "$installed") ))" "$zshrc" | cmp -s - "$installed"; then
+            carry_over_zshrc_additions "$zshrc" "$installed"
+        else
+            info "The ftazsh-managed ~/.zshrc is not as installed; keeping a backup. Personal settings belong in ~/.config/ftazsh/zshrc/."
+        fi
     fi
 
     # Don't pile up identical backups (e.g. uninstall → reinstall cycles).
@@ -470,6 +508,18 @@ create_directories() {
 install_omz() {
     local dest="$FTAZSH_HOME/oh-my-zsh"
     if [[ -d "$dest/.git" ]]; then
+        # The original ftazsh cloned zsh-autosuggestions INSIDE the oh-my-zsh
+        # worktree. oh-my-zsh now ships its own plugins/zsh-autosuggestions,
+        # so such a nested clone makes the pull fail ("untracked working tree
+        # files would be overwritten"). Remove it first — only a nested git
+        # clone, never oh-my-zsh's own files — and restore whatever oh-my-zsh
+        # tracks there. ftazsh's own, current clone lives in custom/plugins.
+        local legacy="$dest/plugins/zsh-autosuggestions"
+        if [[ -d "$legacy/.git" ]]; then
+            rm -rf "$legacy"
+            git -C "$dest" checkout --quiet -- plugins/zsh-autosuggestions 2>/dev/null || true
+            ok "Removed the original ftazsh's zsh-autosuggestions clone from inside oh-my-zsh (ftazsh's copy is in custom/plugins)"
+        fi
         info "Updating oh-my-zsh..."
         git -C "$dest" pull --ff-only --quiet \
             || warn "oh-my-zsh update skipped (offline or local changes)."
@@ -484,14 +534,9 @@ install_plugin_repos() {
     local custom="$FTAZSH_HOME/oh-my-zsh/custom/plugins"
     mkdir -p "$custom"
 
-    # Older ftazsh versions cloned zsh-autosuggestions inside the oh-my-zsh
-    # worktree, which dirties its git status and breaks `omz update`.
-    local legacy="$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions"
-    if [[ -d "$legacy" ]]; then
-        warn "Removing legacy plugin clone inside the oh-my-zsh tree."
-        rm -rf "$legacy"
-    fi
-
+    # oh-my-zsh ships its own copies of zsh-autosuggestions and
+    # zsh-syntax-highlighting under plugins/; they are left alone. The clones
+    # below live in custom/plugins, which oh-my-zsh prefers, and stay current.
     local name dest
     for name in "${PLUGINS[@]}"; do
         dest="$custom/$name"
@@ -679,6 +724,10 @@ copy_config_files() {
     info "Installing configuration files..."
     local f
     install_file "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"
+    # Remember what was installed, so the next run can tell lines other tools
+    # append to ~/.zshrc apart from ftazsh's own content (see backup_zshrc).
+    mkdir -p "$FTAZSH_HOME/state"
+    cp "$SCRIPT_DIR/.zshrc" "$(installed_zshrc_copy)"
     for f in "${MANAGED_FILES[@]}"; do
         install_file "$SCRIPT_DIR/$f" "$FTAZSH_HOME/$f"
     done

@@ -179,6 +179,8 @@ check() {
 }
 # zshi CODE — run CODE in an interactive ftazsh shell (booted from the sandbox HOME).
 zshi() { zsh -i -c "$1"; }
+# zshli CODE — same, as a login shell (~/.zprofile with `brew shellenv` runs first, like a terminal window).
+zshli() { zsh -l -i -c "$1"; }
 
 # Every managed font family must have its representative file in the font dir.
 fonts_ok() {
@@ -256,6 +258,12 @@ check "eza alias runs" zshi 'cd "$HOME" && a >/dev/null'
 check "eza is the default ls with icons/colors/git (ls, ll, la, l, lt run)" zshi 'alias ls | grep -q eza && cd "$HOME" && ls >/dev/null && ll >/dev/null && la >/dev/null && l >/dev/null && lt >/dev/null'
 check "fish-style plugin defaults active" zshi '[[ "${ZSH_AUTOSUGGEST_STRATEGY[*]}" == "history completion" ]] && (( ${ZSH_HIGHLIGHT_HIGHLIGHTERS[(Ie)brackets]} )) && [[ "$HISTORY_SUBSTRING_SEARCH_ENSURE_UNIQUE" == 1 ]] && bindkey -M emacs "^P" | grep -q history-substring-search-up'
 check "yazi wrapper, lazygit alias, tldr present" zshi 'whence y >/dev/null && alias lg >/dev/null && command -v tldr >/dev/null'
+check "login shell: PATH has no duplicate entries after brew shellenv + ftazshrc" zshli \
+    'print "PATH=$PATH"; (( ${#path} == ${#${(@u)path}} ))'
+check "login shell: git completion is zsh's own _git, ahead of Homebrew's site-functions" zshli \
+    'typeset d first=; for d in $fpath; do [[ -e "$d/_git" ]] && { first="$d"; break; }; done; print "first _git in: $first"; [[ -n "$first" && "$first" != *share/zsh/site-functions* ]]'
+check "oh-my-zsh worktree is clean (its bundled plugins are left alone)" bash -c \
+    '[ -z "$(git -C "$HOME/.config/ftazsh/oh-my-zsh" status --porcelain)" ]'
 check "git config include present, user settings kept" bash -c '
     git config --global --get-all include.path | grep -qx "$HOME/.config/ftazsh/gitconfig"
     [ "$(git config --global user.name)" = "Smoke Tester" ]
@@ -307,7 +315,10 @@ check "ftazsh update --check: up to date again, reminder gone" bash -c '
 
 echo
 info "== Re-install (idempotency) and uninstall =="
+echo 'export SMOKE_TOOL_APPENDED=1' >> "$HOME/.zshrc"      # what nvm, conda, bun … do
 check "re-running the installer succeeds" "$REPO_DIR/install.sh" --unattended
+check "lines a tool appended to ~/.zshrc survive the re-install (moved to zshrc/zshrc-additions.zsh, backed up)" zshi \
+    '[[ "$SMOKE_TOOL_APPENDED" == 1 ]] && ! grep -q SMOKE_TOOL_APPENDED "$HOME/.zshrc" && grep -q SMOKE_TOOL_APPENDED "$HOME/.config/ftazsh/zshrc/zshrc-additions.zsh" && grep -lq SMOKE_TOOL_APPENDED "$HOME"/.zshrc-backup-*'
 check "personal config untouched by re-install" bash -c '
     echo "# smoke edit" >> "$HOME/.config/ftazsh/zshrc/personal_rc.zsh"
     "'"$REPO_DIR"'/install.sh" --unattended >/dev/null && grep -q "smoke edit" "$HOME/.config/ftazsh/zshrc/personal_rc.zsh"'

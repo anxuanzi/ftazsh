@@ -146,6 +146,15 @@ setup() {
     [[ "$output" == *"problem(s) found"* ]]
 }
 
+@test "ftazsh doctor flags the original ftazsh's nested plugin clone but not oh-my-zsh's bundled plugin" {
+    mkdir -p "$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions"
+    run "$CLI" doctor
+    [[ "$output" != *"Leftovers"* ]]
+    make_fake_clone "$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions" "https://github.com/zsh-users/zsh-autosuggestions"
+    run "$CLI" doctor
+    [[ "$output" == *"Leftovers"*"oh-my-zsh/plugins/zsh-autosuggestions"* ]]
+}
+
 @test "ftazsh uninstall --yes runs the uninstaller from a staged copy" {
     echo "# ftazsh-managed" > "$HOME/.zshrc"
     run "$CLI" uninstall --yes

@@ -72,6 +72,7 @@ trap - ERR
 trap 'rm -rf "$SCRATCH"' EXIT   # re-arm cleanup (sourcing replaced nothing, but be explicit)
 SCRIPT_DIR="$UPSTREAM"          # install from the working-tree snapshot
 
+backup_zshrc
 create_directories
 install_omz
 migrate_legacy_install
@@ -82,10 +83,19 @@ copy_config_files
 configure_git
 record_install_state
 
+# Between installs: a tool appends to the managed ~/.zshrc (as nvm, conda or
+# bun do), and the original ftazsh's nested zsh-autosuggestions clone is
+# simulated inside oh-my-zsh's own (now bundled) plugin directory.
+echo 'export FROM_A_TOOL_APPEND=1' >> "$HOME/.zshrc"
+if [[ -d "$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions" ]]; then
+    git -C "$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions" init -q
+fi
+
 # zoxide's score for the imported entry; the re-run below must not import again.
 LEGACY_SCORE="$( (command -v zoxide >/dev/null && zoxide query -s legacy-jump-3c9e) 2>/dev/null || true)"
 
 echo "== Re-running installer steps (idempotency, real update paths) =="
+backup_zshrc
 create_directories
 install_omz
 migrate_legacy_install
@@ -175,6 +185,16 @@ check "history-substring-search widgets exist" \
     '[[ "$(whence -w history-substring-search-up)" == *function* ]]'
 check "zsh-completions on fpath" 'print -l $fpath | grep -q "custom/plugins/zsh-completions/src"'
 check "completion dump lands in ~/.cache/zsh" 'ls "$HOME/.cache/zsh"/.zcompdump* >/dev/null'
+check "PATH stays free of duplicates even when a tool re-exports it (typeset -U covers PATH itself)" \
+    'export PATH="/usr/bin:$PATH"; export PATH="/usr/bin:$PATH"; (( ${#path} == ${#${(@u)path}} ))'
+check "_git completion resolves to zsh's own function, never to Homebrew's site-functions" \
+    'typeset d first=; for d in $fpath; do [[ -e "$d/_git" ]] && { first="$d"; break; }; done; [[ -n "$first" && "$first" != *share/zsh/site-functions* ]]'
+check_bash "oh-my-zsh worktree is clean: bundled plugins untouched, nested legacy clone gone" \
+    '[ -z "$(git -C "$1" status --porcelain)" ] && [ ! -d "$1/plugins/zsh-autosuggestions/.git" ]' "$FTAZSH_HOME/oh-my-zsh"
+check "lines a tool appended to the managed ~/.zshrc still take effect (carried into zshrc/zshrc-additions.zsh)" \
+    '[[ "$FROM_A_TOOL_APPEND" == 1 ]]'
+check_bash "…and ~/.zshrc is ftazsh's file again, with a backup of the changed one" \
+    '! grep -q FROM_A_TOOL_APPEND "$HOME/.zshrc" && grep -q FROM_A_TOOL_APPEND "$1/zshrc/zshrc-additions.zsh" && grep -lq FROM_A_TOOL_APPEND "$HOME"/.zshrc-backup-*' "$FTAZSH_HOME"
 check "FZF_DEFAULT_OPTS set, old typo FZF_DEFAULT_OPS gone" \
     '[[ -n "$FZF_DEFAULT_OPTS" && -z "${FZF_DEFAULT_OPS:-}" ]]'
 if command -v zoxide >/dev/null; then

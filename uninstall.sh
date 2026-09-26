@@ -89,9 +89,13 @@ restore_zshrc() {
         return 0
     fi
 
+    # The newest backup of YOUR .zshrc: backups of ftazsh's own file (kept
+    # when tools had appended to it) and the -ftazsh-personal directories
+    # are not candidates.
     local newest="" f
     for f in "$HOME"/.zshrc-backup-*; do
-        [[ -e "$f" ]] || continue
+        [[ -f "$f" ]] || continue
+        grep -q "ftazsh-managed" "$f" && continue
         if [[ -z "$newest" || "$f" -nt "$newest" ]]; then
             newest="$f"
         fi
