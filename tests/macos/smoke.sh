@@ -193,6 +193,15 @@ fonts_ok() {
     echo "${#CASKS[@]} font families present in $FTAZSH_FONT_DIR"
 }
 
+# zoxide registers its completion only when zle is active, i.e. in a real
+# terminal, so this runs inside a pseudo-terminal (not a tty-less zsh -i -c).
+zoxide_completion_ok() {
+    local out
+    out="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$HOME" 1 'print ZOXIDE_COMPDEF=${_comps[__zoxide_z]:-none}')"
+    printf '%s\n' "$out" | tail -3
+    printf '%s\n' "$out" | grep -q 'ZOXIDE_COMPDEF=__zoxide_z_complete'
+}
+
 # `ftazsh doctor` must pass. The one finding tolerated is a login shell that
 # is not zsh: that is a property of the machine (CI runners use bash), not of
 # ftazsh, and the summary line is the second ❌ in that case.
@@ -230,8 +239,9 @@ export POWERLEVEL9K_DISABLE_GITSTATUS=true
 check "interactive zsh boots with no stderr output" bash -c '
     err=$(zsh -i -c exit 2>&1 >/dev/null | grep -v "can'"'"'t change option: zle" || true)
     [ -z "$err" ] || { printf "%s\n" "$err"; exit 1; }'
-check "fzf + zoxide integrations active (widgets, z/zi, chpwd hook, completion registered)" zshi \
-    'whence fzf-history-widget >/dev/null && [[ -n "$FZF_DEFAULT_OPTS" ]] && whence z >/dev/null && whence zi >/dev/null && (( ${chpwd_functions[(Ie)__zoxide_hook]} )) && [[ "${_comps[__zoxide_z]:-}" == __zoxide_z_complete && "$_ZO_FZF_OPTS" == *eza* ]]'
+check "fzf + zoxide integrations active (widgets, z/zi, chpwd hook, eza preview for zi)" zshi \
+    'whence fzf-history-widget >/dev/null && [[ -n "$FZF_DEFAULT_OPTS" ]] && whence z >/dev/null && whence zi >/dev/null && (( ${chpwd_functions[(Ie)__zoxide_hook]} )) && [[ "$_ZO_FZF_OPTS" == *eza* ]]'
+check "zoxide completion registered in a real terminal (z <dir> Space Tab)" zoxide_completion_ok
 check "old z plugin history (~/.z) imported into zoxide; z jumps to it" zshi \
     'z legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]]'
 cp "$FTAZSH_HOME/settings.zsh" "$SANDBOX/settings.zoxide.bak"

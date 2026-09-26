@@ -118,7 +118,11 @@ jobs:
         run: |
           zsh -i -c 'whence fzf-history-widget >/dev/null && [[ -n "$FZF_DEFAULT_OPTS" ]]'
           zsh -i -c 'whence z >/dev/null && whence zi >/dev/null && (( ${chpwd_functions[(Ie)__zoxide_hook]} ))'
-          zsh -i -c '[[ "${_comps[__zoxide_z]:-}" == __zoxide_z_complete && "$_ZO_FZF_OPTS" == *eza* ]]'
+          zsh -i -c '[[ "$_ZO_FZF_OPTS" == *eza* ]]'
+          # zoxide registers its completion only when zle is active, i.e. in a
+          # real terminal: check it inside a pseudo-terminal, not a tty-less zsh -i -c.
+          out="$(zsh tests/lib/render-prompt.zsh "$HOME" 1 'print ZOXIDE_COMPDEF=${_comps[__zoxide_z]:-none}')"
+          printf '%s\n' "$out" | grep -q 'ZOXIDE_COMPDEF=__zoxide_z_complete'
           d="$RUNNER_TEMP/jump-me-51ab"; mkdir -p "$d"; zoxide add "$d"
           zsh -i -c 'z jump-me-51ab && [[ "$PWD" == */jump-me-51ab ]]'
 

@@ -178,8 +178,13 @@ check "completion dump lands in ~/.cache/zsh" 'ls "$HOME/.cache/zsh"/.zcompdump*
 check "FZF_DEFAULT_OPTS set, old typo FZF_DEFAULT_OPS gone" \
     '[[ -n "$FZF_DEFAULT_OPTS" && -z "${FZF_DEFAULT_OPS:-}" ]]'
 if command -v zoxide >/dev/null; then
-    check "zoxide: z and zi defined, chpwd hook installed, completion registered (init ran after compinit)" \
-        'whence z >/dev/null && whence zi >/dev/null && [[ "$(whence -w __zoxide_z)" == *function* ]] && (( ${chpwd_functions[(Ie)__zoxide_hook]} )) && [[ "${_comps[__zoxide_z]:-}" == __zoxide_z_complete ]]'
+    check "zoxide: z and zi defined, chpwd hook installed" \
+        'whence z >/dev/null && whence zi >/dev/null && [[ "$(whence -w __zoxide_z)" == *function* ]] && (( ${chpwd_functions[(Ie)__zoxide_hook]} ))'
+    # zoxide registers its completion only when zle is active, i.e. in a real
+    # terminal, so this runs inside a pseudo-terminal (not a tty-less zsh -i -c).
+    check_bash "zoxide: completion registered in a real terminal (init ran after compinit)" \
+        'out="$(zsh "$1" "$HOME" 1 "print ZOXIDE_COMPDEF=\${_comps[__zoxide_z]:-none}")"; printf "%s\n" "$out" | grep -q "ZOXIDE_COMPDEF=__zoxide_z_complete"' \
+        "$REPO_DIR/tests/lib/render-prompt.zsh"
     check "zoxide: zi picker preview uses eza when eza is present" \
         '! command -v eza >/dev/null || [[ "$_ZO_FZF_OPTS" == *"--preview="*eza* ]]'
     check_bash "zoxide: re-running the migration did not import ~/.z a second time" \
