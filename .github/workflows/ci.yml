@@ -51,8 +51,9 @@ jobs:
       POWERLEVEL9K_DISABLE_GITSTATUS: "true"
       # Silences the startup update check in every shell the job starts.
       FTAZSH_UPDATING: "1"
-      # zoxide's database for the jumps this job makes.
-      _ZO_DATA_DIR: ${{ runner.temp }}/zoxide
+      # zoxide's database for the jumps this job makes (a literal path: the
+      # runner context is not available in a job-level env).
+      _ZO_DATA_DIR: /tmp/ftazsh-ci-zoxide
     steps:
       - uses: actions/checkout@v5
         with:
