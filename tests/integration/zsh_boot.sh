@@ -305,6 +305,19 @@ if git init -q --ref-format=reftable "$SCRATCH/probe" 2>/dev/null; then
     fi
     check_bash "prompt shows the reftable repo's branch" 'printf "%s\n" "$1" | grep -q rt-branch-9f2c' "$RENDER"
     check_bash "prompt never shows '.invalid'" '! printf "%s\n" "$1" | grep -q "\.invalid"' "$RENDER"
+    # While gitstatusd's query is in flight (slow start, hang), p10k would show
+    # "loading"; the shim seeds p10k's cache from the git CLI instead. Emulated
+    # inside the pseudo-terminal, where p10k is fully initialized.
+    INFLIGHT="$(env -u POWERLEVEL9K_DISABLE_GITSTATUS zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 1 \
+        'cd "'"$RT"'"; _p9k_fetch_cwd; _p9k__gitstatus_last=(); typeset -g _p9k__gitstatus_next_dir=""; typeset -g _p9k__prompt="" _p9k__prompt_side=$_p9k_vcs_side _p9k__segment_name=vcs; typeset -gi _p9k__has_upglob=0 _p9k__segment_index=_p9k_vcs_index _p9k__line_index=_p9k_vcs_line_index; _p9k_vcs_render; print -rP -- "INFLIGHT_RENDER=[$_p9k__prompt]"; unset _p9k__gitstatus_next_dir' 2>/dev/null || true)"
+    printf '%s\n' "$INFLIGHT" | grep '^INFLIGHT_RENDER=' | sed 's/^/    inflight: /'
+    check_bash "reftable prompt renders the branch from the git CLI while gitstatusd's query is still in flight (no 'loading')" \
+        'printf "%s\n" "$1" | grep "^INFLIGHT_RENDER=\[" | grep -q rt-branch-9f2c && ! printf "%s\n" "$1" | grep "^INFLIGHT_RENDER=\[" | grep -q loading' "$INFLIGHT"
+    # Control: with the seeding disabled, the same emulation must show p10k's "loading".
+    CONTROL="$(env -u POWERLEVEL9K_DISABLE_GITSTATUS zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 1 \
+        'cd "'"$RT"'"; _p9k_fetch_cwd; _p9k__gitstatus_last=(); functions[_ftazsh_vcs_seed_cache]="return 0"; typeset -g _p9k__gitstatus_next_dir=""; typeset -g _p9k__prompt="" _p9k__prompt_side=$_p9k_vcs_side _p9k__segment_name=vcs; typeset -gi _p9k__has_upglob=0 _p9k__segment_index=_p9k_vcs_index _p9k__line_index=_p9k_vcs_line_index; _p9k_vcs_render; print -rP -- "CONTROL_RENDER=[$_p9k__prompt]"; unset _p9k__gitstatus_next_dir' 2>/dev/null || true)"
+    check_bash "…control: without the seeding the emulation shows p10k's 'loading', so the check above is meaningful" \
+        'printf "%s\n" "$1" | grep "^CONTROL_RENDER=\[" | grep -q loading' "$CONTROL"
     FR="$SCRATCH/files-repo"
     git init -q --ref-format=files -b files-branch-4b1d "$FR"
     git -C "$FR" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init

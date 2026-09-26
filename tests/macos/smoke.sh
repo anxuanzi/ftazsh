@@ -277,22 +277,31 @@ check "ftazsh reftable status" zshi 'ftazsh reftable status'
 check "p10k reftable shim active" zshi '(( FTAZSH_P10K_SHIM ))'
 
 echo
-info "== Prompt in a reftable repository (real gitstatusd) =="
+info "== Prompt in git repositories (real gitstatusd) =="
+unset POWERLEVEL9K_DISABLE_GITSTATUS
+FR="$SANDBOX/files-repo"
+git init -q --ref-format=files -b files-branch-4b1d "$FR"
+git -C "$FR" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+info "(Powerlevel10k fetches gitstatusd on the first prompt unless cached; waiting up to 2 minutes)"
+RENDER2="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$FR" 120 '' files-branch-4b1d || true)"
+printf '%s\n' "$RENDER2" | tail -3 | sed 's/^/    /'
+check "prompt shows the branch of a classic (files) repo" bash -c "printf '%s\n' \"\$1\" | grep -q files-branch-4b1d" _ "$RENDER2"
 RT="$SANDBOX/rt-repo"
 git init -q --ref-format=reftable -b rt-branch-9f2c "$RT"
 git -C "$RT" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
 check "reftable repo created" bash -c "git -C '$RT' rev-parse --show-ref-format | grep -qx reftable"
-unset POWERLEVEL9K_DISABLE_GITSTATUS
-info "(Powerlevel10k fetches gitstatusd on the first prompt unless cached; waiting up to 2 minutes)"
-RENDER="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 120 '' rt-branch-9f2c || true)"
+RENDER="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 60 '' rt-branch-9f2c || true)"
 printf '%s\n' "$RENDER" | tail -6 | sed 's/^/    /'
 check "prompt shows the reftable branch" bash -c "printf '%s\n' \"\$1\" | grep -q rt-branch-9f2c" _ "$RENDER"
 check "prompt does not show '.invalid'" bash -c "! printf '%s\n' \"\$1\" | grep -q '\\.invalid'" _ "$RENDER"
-FR="$SANDBOX/files-repo"
-git init -q --ref-format=files -b files-branch-4b1d "$FR"
-git -C "$FR" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
-RENDER2="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$FR" 60 '' files-branch-4b1d || true)"
-check "prompt still shows the branch of a classic (files) repo" bash -c "printf '%s\n' \"\$1\" | grep -q files-branch-4b1d" _ "$RENDER2"
+# While gitstatusd's query is in flight (slow start, hang), p10k would show
+# "loading"; the shim seeds p10k's cache from the git CLI instead. Emulated
+# inside the pseudo-terminal, where p10k is fully initialized.
+INFLIGHT="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 1 \
+    'cd "'"$RT"'"; _p9k_fetch_cwd; _p9k__gitstatus_last=(); typeset -g _p9k__gitstatus_next_dir=""; typeset -g _p9k__prompt="" _p9k__prompt_side=$_p9k_vcs_side _p9k__segment_name=vcs; typeset -gi _p9k__has_upglob=0 _p9k__segment_index=_p9k_vcs_index _p9k__line_index=_p9k_vcs_line_index; _p9k_vcs_render; print -rP -- "INFLIGHT_RENDER=[$_p9k__prompt]"; unset _p9k__gitstatus_next_dir' || true)"
+printf '%s\n' "$INFLIGHT" | grep '^INFLIGHT_RENDER=' | sed 's/^/    /'
+check "reftable prompt renders the branch from the git CLI while gitstatusd's query is still in flight (no 'loading')" bash -c "
+    printf '%s\n' \"\$1\" | grep '^INFLIGHT_RENDER=\[' | grep -q rt-branch-9f2c && ! printf '%s\n' \"\$1\" | grep '^INFLIGHT_RENDER=\[' | grep -q loading" _ "$INFLIGHT"
 check "ftazsh reftable migrate converts a files repo" bash -c "
     cd '$FR' && zsh -i -c 'ftazsh reftable migrate --yes' && git rev-parse --show-ref-format | grep -qx reftable"
 export POWERLEVEL9K_DISABLE_GITSTATUS=true
