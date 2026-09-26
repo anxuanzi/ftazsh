@@ -190,6 +190,46 @@ setup() {
     [ -z "$output" ]
 }
 
+@test "migrate_legacy_install seeds an empty zoxide with the old z plugin's ~/.z" {
+    create_directories
+    stub_zoxide
+    printf '/Users/me/code|42|1700000000\n' > "$HOME/.z"
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"~/.z"*zoxide* ]]
+    grep -qF -- "zoxide import --from z $HOME/.z" "$STUB_LOG"
+    [ -f "$HOME/.z" ]
+}
+
+@test "migrate_legacy_install leaves a zoxide database that already has history alone" {
+    create_directories
+    stub_zoxide
+    export ZOXIDE_IMPORT_ERROR="current database is not empty, specify --merge to continue anyway"
+    printf '/Users/me/code|42|1700000000\n' > "$HOME/.z"
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "migrate_legacy_install warns when the ~/.z import fails for another reason" {
+    create_directories
+    stub_zoxide
+    export ZOXIDE_IMPORT_ERROR="could not open database"
+    printf '/Users/me/code|42|1700000000\n' > "$HOME/.z"
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Could not import"*"could not open database"* ]]
+}
+
+@test "migrate_legacy_install does not call zoxide without a ~/.z" {
+    create_directories
+    stub_zoxide
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    ! grep -q zoxide "$STUB_LOG"
+}
+
 # ---------- ftazsh's own clone ----------
 
 @test "sync_repo clones this checkout, points origin at the upstream and records the branch" {

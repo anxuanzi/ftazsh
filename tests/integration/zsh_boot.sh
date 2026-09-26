@@ -17,6 +17,7 @@ trap 'rm -rf "$SCRATCH"' EXIT
 
 export HOME="$SCRATCH"
 export FTAZSH_HOME="$HOME/.config/ftazsh"
+export _ZO_DATA_DIR="$SCRATCH/zoxide"   # zoxide's database stays inside the scratch HOME on every OS
 
 # Don't let the invoking shell's environment leak into the boots under test
 # (e.g. a developer's own FZF_* exports from a previous ftazsh install).
@@ -58,8 +59,11 @@ printf '#!/usr/bin/env bash\necho "UserShell: /bin/zsh"\n' > "$STUBS/dscl"
 chmod +x "$STUBS"/*
 export FTAZSH_FONT_DIR="$SCRATCH/fonts"
 
-# Pre-existing user state the installer must respect.
+# Pre-existing user state the installer must respect, including the directory
+# history of the original ftazsh's z plugin (~/.z), which zoxide should inherit.
 printf '[user]\n\tname = Integration\n[core]\n\tpager = less\n' > "$HOME/.gitconfig"
+mkdir -p "$HOME/legacy-jump-3c9e"
+printf '%s|42|%s\n' "$HOME/legacy-jump-3c9e" "$(date +%s)" > "$HOME/.z"
 
 echo "== Building layout in $SCRATCH using installer functions =="
 # shellcheck disable=SC1090
@@ -78,9 +82,13 @@ copy_config_files
 configure_git
 record_install_state
 
+# zoxide's score for the imported entry; the re-run below must not import again.
+LEGACY_SCORE="$( (command -v zoxide >/dev/null && zoxide query -s legacy-jump-3c9e) 2>/dev/null || true)"
+
 echo "== Re-running installer steps (idempotency, real update paths) =="
 create_directories
 install_omz
+migrate_legacy_install
 install_plugin_repos
 install_p10k
 sync_repo
@@ -169,8 +177,23 @@ check "zsh-completions on fpath" 'print -l $fpath | grep -q "custom/plugins/zsh-
 check "completion dump lands in ~/.cache/zsh" 'ls "$HOME/.cache/zsh"/.zcompdump* >/dev/null'
 check "FZF_DEFAULT_OPTS set, old typo FZF_DEFAULT_OPS gone" \
     '[[ -n "$FZF_DEFAULT_OPTS" && -z "${FZF_DEFAULT_OPS:-}" ]]'
-check "zoxide active when present (z resolves, __zoxide_z is a function)" \
-    '! command -v zoxide >/dev/null || { whence z >/dev/null && [[ "$(whence -w __zoxide_z)" == *function* ]]; }'
+if command -v zoxide >/dev/null; then
+    check "zoxide: z and zi defined, chpwd hook installed, completion registered (init ran after compinit)" \
+        'whence z >/dev/null && whence zi >/dev/null && [[ "$(whence -w __zoxide_z)" == *function* ]] && (( ${chpwd_functions[(Ie)__zoxide_hook]} )) && [[ "${_comps[__zoxide_z]:-}" == __zoxide_z_complete ]]'
+    check "zoxide: zi picker preview uses eza when eza is present" \
+        '! command -v eza >/dev/null || [[ "$_ZO_FZF_OPTS" == *"--preview="*eza* ]]'
+    check_bash "zoxide: re-running the migration did not import ~/.z a second time" \
+        '[ -n "$1" ] && [ "$(zoxide query -s legacy-jump-3c9e)" = "$1" ]' "$LEGACY_SCORE"
+    check "zoxide: the old z plugin's history (~/.z) was imported and z jumps to it" \
+        'z legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]]'
+    cp "$FTAZSH_HOME/settings.zsh" "$SCRATCH/settings.zoxide.bak"
+    echo "FTAZSH_ZOXIDE_CMD=cd" >> "$FTAZSH_HOME/settings.zsh"
+    check "zoxide: FTAZSH_ZOXIDE_CMD=cd makes zoxide the cd (cd jumps, cdi picks, plain paths still work)" \
+        '[[ "$(whence cd)" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
+    cp "$SCRATCH/settings.zoxide.bak" "$FTAZSH_HOME/settings.zsh"
+else
+    echo "skip: zoxide not installed here; its checks run in the macOS jobs"
+fi
 check "graceful degradation: no MANPAGER when bat is absent" \
     'command -v bat >/dev/null || [[ -z "${MANPAGER:-}" ]]'
 check "graceful degradation: no yazi wrapper / lazygit alias when absent" \

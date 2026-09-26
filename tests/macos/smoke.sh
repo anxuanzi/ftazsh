@@ -140,6 +140,8 @@ export FTAZSH_FONT_DIR="$REAL_HOME/Library/Fonts"
 # Powerlevel10k downloads gitstatusd on the first prompt; share the standard
 # cache so re-runs (and a Mac that already runs p10k) don't fetch it again.
 export GITSTATUS_CACHE_DIR="${GITSTATUS_CACHE_DIR:-${XDG_CACHE_HOME:-$REAL_HOME/.cache}/gitstatus}"
+# The test's directory jumps must not land in your real zoxide database.
+export _ZO_DATA_DIR="$SANDBOX/zoxide"
 # Hermetic prompt boots for the checks (the reftable render check enables gitstatus).
 export POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
 export POWERLEVEL9K_INSTANT_PROMPT=off
@@ -156,9 +158,12 @@ git -C "$UPSTREAM" config user.email smoke@example.com
 export FTAZSH_REPO_URL="file://$UPSTREAM"
 export FTAZSH_REPO_BRANCH=smoke
 
-# Pre-existing user state the installer must preserve.
+# Pre-existing user state the installer must preserve, plus the directory
+# history of the original ftazsh's z plugin (~/.z), which zoxide should inherit.
 echo 'export SMOKE_PRE_EXISTING_ZSHRC=1' > "$HOME/.zshrc"
 git config --global user.name "Smoke Tester"
+mkdir -p "$HOME/legacy-jump-3c9e"
+printf '%s|42|%s\n' "$HOME/legacy-jump-3c9e" "$(date +%s)" > "$HOME/.z"
 
 FTAZSH_HOME="$HOME/.config/ftazsh"
 
@@ -225,8 +230,15 @@ export POWERLEVEL9K_DISABLE_GITSTATUS=true
 check "interactive zsh boots with no stderr output" bash -c '
     err=$(zsh -i -c exit 2>&1 >/dev/null | grep -v "can'"'"'t change option: zle" || true)
     [ -z "$err" ] || { printf "%s\n" "$err"; exit 1; }'
-check "fzf + zoxide integrations active" bash -c '
-    zsh -i -c "whence fzf-history-widget >/dev/null && whence __zoxide_z >/dev/null && [[ -n \$FZF_DEFAULT_OPTS ]]"'
+check "fzf + zoxide integrations active (widgets, z/zi, chpwd hook, completion registered)" zshi \
+    'whence fzf-history-widget >/dev/null && [[ -n "$FZF_DEFAULT_OPTS" ]] && whence z >/dev/null && whence zi >/dev/null && (( ${chpwd_functions[(Ie)__zoxide_hook]} )) && [[ "${_comps[__zoxide_z]:-}" == __zoxide_z_complete && "$_ZO_FZF_OPTS" == *eza* ]]'
+check "old z plugin history (~/.z) imported into zoxide; z jumps to it" zshi \
+    'z legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]]'
+cp "$FTAZSH_HOME/settings.zsh" "$SANDBOX/settings.zoxide.bak"
+echo "FTAZSH_ZOXIDE_CMD=cd" >> "$FTAZSH_HOME/settings.zsh"
+check "FTAZSH_ZOXIDE_CMD=cd makes zoxide the cd (cd jumps, cdi picks, plain paths still work)" zshi \
+    '[[ "$(whence cd)" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
+cp "$SANDBOX/settings.zoxide.bak" "$FTAZSH_HOME/settings.zsh"
 check "eza alias runs" zshi 'cd "$HOME" && a >/dev/null'
 check "eza is the default ls with icons/colors/git (ls, ll, la, l, lt run)" zshi 'alias ls | grep -q eza && cd "$HOME" && ls >/dev/null && ll >/dev/null && la >/dev/null && l >/dev/null && lt >/dev/null'
 check "fish-style plugin defaults active" zshi '[[ "${ZSH_AUTOSUGGEST_STRATEGY[*]}" == "history completion" ]] && (( ${ZSH_HIGHLIGHT_HIGHLIGHTERS[(Ie)brackets]} )) && [[ "$HISTORY_SUBSTRING_SEARCH_ENSURE_UNIQUE" == 1 ]] && bindkey -M emacs "^P" | grep -q history-substring-search-up'

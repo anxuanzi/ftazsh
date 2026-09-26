@@ -574,6 +574,19 @@ migrate_legacy_install() {
         rm -rf "$SCRIPT_DIR/nerd-fonts"
         removed+=("nerd-fonts clone in the checkout (${size:-?}; fonts come from Homebrew now)")
     fi
+    # The original ftazsh used oh-my-zsh's z plugin, which kept your directory
+    # history in ~/.z. Seed zoxide with it while zoxide's own database is still
+    # empty (zoxide refuses to import into a non-empty one without --merge, so
+    # this runs at most once and never touches history zoxide already has).
+    if [[ -s "$HOME/.z" ]] && command -v zoxide >/dev/null 2>&1; then
+        local import_err
+        # shellcheck disable=SC2069  # stderr is what we want to capture
+        if import_err="$(zoxide import --from z "$HOME/.z" 2>&1 >/dev/null)"; then
+            ok "Imported the old z plugin's directory history (~/.z) into zoxide; ~/.z itself was left in place"
+        elif [[ "$import_err" != *"not empty"* ]]; then
+            warn "Could not import ~/.z into zoxide: ${import_err:-unknown error}"
+        fi
+    fi
     if [[ "${#removed[@]}" -gt 0 ]]; then
         ok "Cleaned up leftovers of an older ftazsh version:"
         for f in "${removed[@]}"; do

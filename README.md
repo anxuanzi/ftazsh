@@ -22,7 +22,7 @@ Intel). The installer refuses to run anywhere else. Works with Homebrew 5–7.
 | [fd](https://github.com/sharkdp/fd) | `find` | powers fzf file and directory search (respects `.gitignore`) |
 | [ripgrep](https://github.com/BurntSushi/ripgrep) | `grep` | installed, ready to use as `rg` |
 | [fzf](https://github.com/junegunn/fzf) | — | `Ctrl-R` history (`Ctrl-/` preview), `Ctrl-T` files, `Alt-C` cd |
-| [zoxide](https://github.com/ajeetdsouza/zoxide) | `cd` | `z <fuzzy-dir>` jumps, `zi` interactive picker |
+| [zoxide](https://github.com/ajeetdsouza/zoxide) | `cd` | `z <dir>` jumps, `zi` picks interactively (eza preview), `z <dir>` + `Space` `Tab` completes; `FTAZSH_ZOXIDE_CMD=cd` makes it your `cd` |
 | [jq](https://github.com/jqlang/jq) | — | installed, ready to use |
 | [delta](https://github.com/dandavison/delta) | git's diff pager | git pager and `git add -p` filter ([git defaults](#git-defaults-ftazsh-sets)) |
 | [difftastic](https://github.com/Wilfred/difftastic) | `diff` | `git dft`, `git dlog`, `git dshow` (structural diffs) |
@@ -171,9 +171,11 @@ That is the whole upgrade, whichever version you have:
   and the `~/.fzf.zsh` / `~/.fzf.bash` it generated, the `marker` clone, and
   the multi-gigabyte `nerd-fonts` clone inside the checkout. Only clones the
   old installer made are touched; a plugin you put there yourself stays.
-  marker's data in `~/.local/share/marker` is left alone. If one of your own
-  files in `zshrc/` still adds a removed plugin (`k`, `z`, `marker`), remove
-  that line to silence oh-my-zsh's warning.
+  marker's data in `~/.local/share/marker` is left alone. The `z` plugin's
+  directory history (`~/.z`) is imported into zoxide, so `z` keeps knowing
+  your directories (only while zoxide's own database is still empty; `~/.z`
+  itself stays). If one of your own files in `zshrc/` still adds a removed
+  plugin (`k`, `z`, `marker`), remove that line to silence oh-my-zsh's warning.
 
 `ftazsh doctor` points out any leftovers it still sees. Prefer a fresh start?
 `ftazsh reinstall` (or `./uninstall.sh` followed by `./install.sh`) gives you
@@ -204,6 +206,7 @@ which ftazsh never overwrites:
 FTAZSH_UPDATE_MODE=prompt        # prompt | auto | reminder | disabled
 FTAZSH_UPDATE_FREQUENCY_DAYS=7
 FTAZSH_UPDATE_TOOLS=1            # 0 = updates don't touch the Homebrew tools
+FTAZSH_ZOXIDE_CMD=z              # cd = zoxide becomes your cd (cd jumps, cdi picks)
 ```
 
 oh-my-zsh's own update prompts are disabled on purpose — ftazsh updates it.

@@ -22,3 +22,9 @@ FTAZSH_UPDATE_TOOLS=1
 # (see git.zsh). Repositories whose index is larger than this many bytes only
 # show branch / ahead / behind, skipping the dirty-state scan.
 # FTAZSH_VCS_MAX_INDEX_BYTES=16777216
+
+# --- directory jumping (zoxide) ---------------------------------------------
+#   z    keeps cd as it is: `z proj` jumps to your most-used matching directory,
+#        `zi` picks one interactively (default)
+#   cd   makes zoxide *be* cd: `cd proj` jumps too, `cdi` is the picker
+FTAZSH_ZOXIDE_CMD=z
