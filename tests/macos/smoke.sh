@@ -85,7 +85,8 @@ fi
 # Sandbox
 #######################################
 
-SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/ftazsh-smoke.XXXXXX")"
+TMPBASE="${TMPDIR:-/tmp}"
+SANDBOX="$(mktemp -d "${TMPBASE%/}/ftazsh-smoke.XXXXXX")"   # no double slash: macOS TMPDIR ends in /
 PRE_FORMULAE="$(brew list --formula 2>/dev/null || true)"
 PRE_CASKS="$(brew list --cask 2>/dev/null || true)"
 PASS=0
@@ -243,12 +244,13 @@ check "interactive zsh boots with no stderr output" bash -c '
 check "fzf + zoxide integrations active (widgets, z/zi, chpwd hook, eza preview for zi)" zshi \
     'whence fzf-history-widget >/dev/null && [[ -n "$FZF_DEFAULT_OPTS" ]] && whence z >/dev/null && whence zi >/dev/null && (( ${chpwd_functions[(Ie)__zoxide_hook]} )) && [[ "$_ZO_FZF_OPTS" == *eza* ]]'
 check "zoxide completion registered in a real terminal (z <dir> Space Tab)" zoxide_completion_ok
+# Paths are compared resolved (:A): on macOS the sandbox is under /var, a symlink to /private/var.
 check "old z plugin history (~/.z) imported into zoxide; z jumps to it" zshi \
-    'z legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]]'
+    'z legacy-jump-3c9e && [[ "${PWD:A}" == "${HOME:A}/legacy-jump-3c9e" ]]'
 cp "$FTAZSH_HOME/settings.zsh" "$SANDBOX/settings.zoxide.bak"
 echo "FTAZSH_ZOXIDE_CMD=cd" >> "$FTAZSH_HOME/settings.zsh"
 check "FTAZSH_ZOXIDE_CMD=cd makes zoxide the cd (cd jumps, cdi picks, plain paths still work)" zshi \
-    '[[ "${aliases[cd]:-}${functions[cd]:-}" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
+    '[[ "${aliases[cd]:-}${functions[cd]:-}" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "${PWD:A}" == "${HOME:A}/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
 cp "$SANDBOX/settings.zoxide.bak" "$FTAZSH_HOME/settings.zsh"
 check "eza alias runs" zshi 'cd "$HOME" && a >/dev/null'
 check "eza is the default ls with icons/colors/git (ls, ll, la, l, lt run)" zshi 'alias ls | grep -q eza && cd "$HOME" && ls >/dev/null && ll >/dev/null && la >/dev/null && l >/dev/null && lt >/dev/null'

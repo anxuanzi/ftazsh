@@ -191,11 +191,11 @@ if command -v zoxide >/dev/null; then
     check_bash "zoxide: re-running the migration did not import ~/.z a second time" \
         '[ -n "$1" ] && [ "$(zoxide query -s legacy-jump-3c9e)" = "$1" ]' "$LEGACY_SCORE"
     check "zoxide: the old z plugin's history (~/.z) was imported and z jumps to it" \
-        'z legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]]'
+        'z legacy-jump-3c9e && [[ "${PWD:A}" == "${HOME:A}/legacy-jump-3c9e" ]]'
     cp "$FTAZSH_HOME/settings.zsh" "$SCRATCH/settings.zoxide.bak"
     echo "FTAZSH_ZOXIDE_CMD=cd" >> "$FTAZSH_HOME/settings.zsh"
     check "zoxide: FTAZSH_ZOXIDE_CMD=cd makes zoxide the cd (cd jumps, cdi picks, plain paths still work)" \
-        '[[ "${aliases[cd]:-}${functions[cd]:-}" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
+        '[[ "${aliases[cd]:-}${functions[cd]:-}" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "${PWD:A}" == "${HOME:A}/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
     cp "$SCRATCH/settings.zoxide.bak" "$FTAZSH_HOME/settings.zsh"
 else
     echo "skip: zoxide not installed here; its checks run in the macOS jobs"
