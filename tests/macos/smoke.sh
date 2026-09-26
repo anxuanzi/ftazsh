@@ -85,7 +85,8 @@ fi
 # Sandbox
 #######################################
 
-SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/ftazsh-smoke.XXXXXX")"
+TMPBASE="${TMPDIR:-/tmp}"
+SANDBOX="$(mktemp -d "${TMPBASE%/}/ftazsh-smoke.XXXXXX")"   # no double slash: macOS TMPDIR ends in /
 PRE_FORMULAE="$(brew list --formula 2>/dev/null || true)"
 PRE_CASKS="$(brew list --cask 2>/dev/null || true)"
 PASS=0
@@ -140,6 +141,8 @@ export FTAZSH_FONT_DIR="$REAL_HOME/Library/Fonts"
 # Powerlevel10k downloads gitstatusd on the first prompt; share the standard
 # cache so re-runs (and a Mac that already runs p10k) don't fetch it again.
 export GITSTATUS_CACHE_DIR="${GITSTATUS_CACHE_DIR:-${XDG_CACHE_HOME:-$REAL_HOME/.cache}/gitstatus}"
+# The test's directory jumps must not land in your real zoxide database.
+export _ZO_DATA_DIR="$SANDBOX/zoxide"
 # Hermetic prompt boots for the checks (the reftable render check enables gitstatus).
 export POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
 export POWERLEVEL9K_INSTANT_PROMPT=off
@@ -156,9 +159,12 @@ git -C "$UPSTREAM" config user.email smoke@example.com
 export FTAZSH_REPO_URL="file://$UPSTREAM"
 export FTAZSH_REPO_BRANCH=smoke
 
-# Pre-existing user state the installer must preserve.
+# Pre-existing user state the installer must preserve, plus the directory
+# history of the original ftazsh's z plugin (~/.z), which zoxide should inherit.
 echo 'export SMOKE_PRE_EXISTING_ZSHRC=1' > "$HOME/.zshrc"
 git config --global user.name "Smoke Tester"
+mkdir -p "$HOME/legacy-jump-3c9e"
+printf '%s|42|%s\n' "$HOME/legacy-jump-3c9e" "$(date +%s)" > "$HOME/.z"
 
 FTAZSH_HOME="$HOME/.config/ftazsh"
 
@@ -173,6 +179,8 @@ check() {
 }
 # zshi CODE — run CODE in an interactive ftazsh shell (booted from the sandbox HOME).
 zshi() { zsh -i -c "$1"; }
+# zshli CODE — same, as a login shell (~/.zprofile with `brew shellenv` runs first, like a terminal window).
+zshli() { zsh -l -i -c "$1"; }
 
 # Every managed font family must have its representative file in the font dir.
 fonts_ok() {
@@ -186,6 +194,16 @@ fonts_ok() {
         return 1
     fi
     echo "${#CASKS[@]} font families present in $FTAZSH_FONT_DIR"
+}
+
+# zoxide registers its completion only when zle is active, i.e. in a real
+# terminal, so this runs inside a pseudo-terminal (not a tty-less zsh -i -c).
+# zoxide 0.10 registers it on `z`, 0.9 on `__zoxide_z`.
+zoxide_completion_ok() {
+    local out
+    out="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$HOME" 1 'print ZOXIDE_COMPDEF=${_comps[z]:-${_comps[__zoxide_z]:-none}}')"
+    printf '%s\n' "$out" | tail -3
+    printf '%s\n' "$out" | grep -q 'ZOXIDE_COMPDEF=__zoxide_z_complete'
 }
 
 # `ftazsh doctor` must pass. The one finding tolerated is a login shell that
@@ -225,12 +243,27 @@ export POWERLEVEL9K_DISABLE_GITSTATUS=true
 check "interactive zsh boots with no stderr output" bash -c '
     err=$(zsh -i -c exit 2>&1 >/dev/null | grep -v "can'"'"'t change option: zle" || true)
     [ -z "$err" ] || { printf "%s\n" "$err"; exit 1; }'
-check "fzf + zoxide integrations active" bash -c '
-    zsh -i -c "whence fzf-history-widget >/dev/null && whence __zoxide_z >/dev/null && [[ -n \$FZF_DEFAULT_OPTS ]]"'
+check "fzf + zoxide integrations active (widgets, z/zi, chpwd hook, eza preview for zi)" zshi \
+    'whence fzf-history-widget >/dev/null && [[ -n "$FZF_DEFAULT_OPTS" ]] && whence z >/dev/null && whence zi >/dev/null && (( ${chpwd_functions[(Ie)__zoxide_hook]} )) && [[ "$_ZO_FZF_OPTS" == *eza* ]]'
+check "zoxide completion registered in a real terminal (z <dir> Space Tab)" zoxide_completion_ok
+# Paths are compared resolved (:A): on macOS the sandbox is under /var, a symlink to /private/var.
+check "old z plugin history (~/.z) imported into zoxide; z jumps to it" zshi \
+    'z legacy-jump-3c9e && [[ "${PWD:A}" == "${HOME:A}/legacy-jump-3c9e" ]]'
+cp "$FTAZSH_HOME/settings.zsh" "$SANDBOX/settings.zoxide.bak"
+echo "FTAZSH_ZOXIDE_CMD=cd" >> "$FTAZSH_HOME/settings.zsh"
+check "FTAZSH_ZOXIDE_CMD=cd makes zoxide the cd (cd jumps, cdi picks, plain paths still work)" zshi \
+    '[[ "${aliases[cd]:-}${functions[cd]:-}" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "${PWD:A}" == "${HOME:A}/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
+cp "$SANDBOX/settings.zoxide.bak" "$FTAZSH_HOME/settings.zsh"
 check "eza alias runs" zshi 'cd "$HOME" && a >/dev/null'
 check "eza is the default ls with icons/colors/git (ls, ll, la, l, lt run)" zshi 'alias ls | grep -q eza && cd "$HOME" && ls >/dev/null && ll >/dev/null && la >/dev/null && l >/dev/null && lt >/dev/null'
 check "fish-style plugin defaults active" zshi '[[ "${ZSH_AUTOSUGGEST_STRATEGY[*]}" == "history completion" ]] && (( ${ZSH_HIGHLIGHT_HIGHLIGHTERS[(Ie)brackets]} )) && [[ "$HISTORY_SUBSTRING_SEARCH_ENSURE_UNIQUE" == 1 ]] && bindkey -M emacs "^P" | grep -q history-substring-search-up'
 check "yazi wrapper, lazygit alias, tldr present" zshi 'whence y >/dev/null && alias lg >/dev/null && command -v tldr >/dev/null'
+check "login shell: PATH has no duplicate entries after brew shellenv + ftazshrc" zshli \
+    'print "PATH=$PATH"; (( ${#path} == ${#${(@u)path}} ))'
+check "login shell: git completion is zsh's own _git, ahead of Homebrew's site-functions" zshli \
+    'typeset d first=; for d in $fpath; do [[ -e "$d/_git" ]] && { first="$d"; break; }; done; print "first _git in: $first"; [[ -n "$first" && "$first" != *share/zsh/site-functions* ]]'
+check "oh-my-zsh worktree is clean (its bundled plugins are left alone)" bash -c \
+    '[ -z "$(git -C "$HOME/.config/ftazsh/oh-my-zsh" status --porcelain)" ]'
 check "git config include present, user settings kept" bash -c '
     git config --global --get-all include.path | grep -qx "$HOME/.config/ftazsh/gitconfig"
     [ "$(git config --global user.name)" = "Smoke Tester" ]
@@ -244,22 +277,31 @@ check "ftazsh reftable status" zshi 'ftazsh reftable status'
 check "p10k reftable shim active" zshi '(( FTAZSH_P10K_SHIM ))'
 
 echo
-info "== Prompt in a reftable repository (real gitstatusd) =="
+info "== Prompt in git repositories (real gitstatusd) =="
+unset POWERLEVEL9K_DISABLE_GITSTATUS
+FR="$SANDBOX/files-repo"
+git init -q --ref-format=files -b files-branch-4b1d "$FR"
+git -C "$FR" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+info "(Powerlevel10k fetches gitstatusd on the first prompt unless cached; waiting up to 2 minutes)"
+RENDER2="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$FR" 120 '' files-branch-4b1d || true)"
+printf '%s\n' "$RENDER2" | tail -3 | sed 's/^/    /'
+check "prompt shows the branch of a classic (files) repo" bash -c "printf '%s\n' \"\$1\" | grep -q files-branch-4b1d" _ "$RENDER2"
 RT="$SANDBOX/rt-repo"
 git init -q --ref-format=reftable -b rt-branch-9f2c "$RT"
 git -C "$RT" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
 check "reftable repo created" bash -c "git -C '$RT' rev-parse --show-ref-format | grep -qx reftable"
-unset POWERLEVEL9K_DISABLE_GITSTATUS
-info "(Powerlevel10k fetches gitstatusd on the first prompt unless cached; waiting up to 2 minutes)"
-RENDER="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 120 '' rt-branch-9f2c || true)"
+RENDER="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 60 '' rt-branch-9f2c || true)"
 printf '%s\n' "$RENDER" | tail -6 | sed 's/^/    /'
 check "prompt shows the reftable branch" bash -c "printf '%s\n' \"\$1\" | grep -q rt-branch-9f2c" _ "$RENDER"
 check "prompt does not show '.invalid'" bash -c "! printf '%s\n' \"\$1\" | grep -q '\\.invalid'" _ "$RENDER"
-FR="$SANDBOX/files-repo"
-git init -q --ref-format=files -b files-branch-4b1d "$FR"
-git -C "$FR" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
-RENDER2="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$FR" 60 '' files-branch-4b1d || true)"
-check "prompt still shows the branch of a classic (files) repo" bash -c "printf '%s\n' \"\$1\" | grep -q files-branch-4b1d" _ "$RENDER2"
+# While gitstatusd's query is in flight (slow start, hang), p10k would show
+# "loading"; the shim seeds p10k's cache from the git CLI instead. Emulated
+# inside the pseudo-terminal, where p10k is fully initialized.
+INFLIGHT="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 1 \
+    'cd "'"$RT"'"; _p9k_fetch_cwd; _p9k__gitstatus_last=(); typeset -g _p9k__gitstatus_next_dir=""; typeset -g _p9k__prompt="" _p9k__prompt_side=$_p9k_vcs_side _p9k__segment_name=vcs; typeset -gi _p9k__has_upglob=0 _p9k__segment_index=_p9k_vcs_index _p9k__line_index=_p9k_vcs_line_index; _p9k_vcs_render; print -rP -- "INFLIGHT_RENDER=[$_p9k__prompt]"; unset _p9k__gitstatus_next_dir' || true)"
+printf '%s\n' "$INFLIGHT" | grep '^INFLIGHT_RENDER=' | sed 's/^/    /'
+check "reftable prompt renders the branch from the git CLI while gitstatusd's query is still in flight (no 'loading')" bash -c "
+    printf '%s\n' \"\$1\" | grep '^INFLIGHT_RENDER=\[' | grep -q rt-branch-9f2c && ! printf '%s\n' \"\$1\" | grep '^INFLIGHT_RENDER=\[' | grep -q loading" _ "$INFLIGHT"
 check "ftazsh reftable migrate converts a files repo" bash -c "
     cd '$FR' && zsh -i -c 'ftazsh reftable migrate --yes' && git rev-parse --show-ref-format | grep -qx reftable"
 export POWERLEVEL9K_DISABLE_GITSTATUS=true
@@ -282,7 +324,10 @@ check "ftazsh update --check: up to date again, reminder gone" bash -c '
 
 echo
 info "== Re-install (idempotency) and uninstall =="
+echo 'export SMOKE_TOOL_APPENDED=1' >> "$HOME/.zshrc"      # what nvm, conda, bun … do
 check "re-running the installer succeeds" "$REPO_DIR/install.sh" --unattended
+check "lines a tool appended to ~/.zshrc survive the re-install (moved to zshrc/zshrc-additions.zsh, backed up)" zshi \
+    '[[ "$SMOKE_TOOL_APPENDED" == 1 ]] && ! grep -q SMOKE_TOOL_APPENDED "$HOME/.zshrc" && grep -q SMOKE_TOOL_APPENDED "$HOME/.config/ftazsh/zshrc/zshrc-additions.zsh" && grep -lq SMOKE_TOOL_APPENDED "$HOME"/.zshrc-backup-*'
 check "personal config untouched by re-install" bash -c '
     echo "# smoke edit" >> "$HOME/.config/ftazsh/zshrc/personal_rc.zsh"
     "'"$REPO_DIR"'/install.sh" --unattended >/dev/null && grep -q "smoke edit" "$HOME/.config/ftazsh/zshrc/personal_rc.zsh"'

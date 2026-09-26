@@ -72,11 +72,50 @@ setup() {
     grep -q "user stuff" "${backups[0]}"
 }
 
-@test "backup_zshrc skips ftazsh-managed .zshrc" {
-    echo "# ftazsh-managed — do not edit" > "$HOME/.zshrc"
+@test "backup_zshrc skips a managed .zshrc that is exactly what ftazsh installed" {
+    create_directories
+    cp "$REPO_DIR/.zshrc" "$HOME/.zshrc"
+    cp "$REPO_DIR/.zshrc" "$FTAZSH_HOME/state/zshrc.installed"
+    run backup_zshrc
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    run bash -c "ls $HOME/.zshrc-backup-* 2>/dev/null"
+    [ "$status" -ne 0 ]
+}
+
+@test "backup_zshrc skips a managed .zshrc identical to this version's file when none was recorded" {
+    create_directories
+    cp "$REPO_DIR/.zshrc" "$HOME/.zshrc"
     backup_zshrc
     run bash -c "ls $HOME/.zshrc-backup-* 2>/dev/null"
     [ "$status" -ne 0 ]
+}
+
+@test "backup_zshrc rescues lines other tools appended to the managed .zshrc, once" {
+    create_directories
+    cp "$REPO_DIR/.zshrc" "$FTAZSH_HOME/state/zshrc.installed"
+    cp "$REPO_DIR/.zshrc" "$HOME/.zshrc"
+    printf '\n# added by some-tool\nexport SOME_TOOL_HOME="$HOME/.some-tool"\n' >> "$HOME/.zshrc"
+    run backup_zshrc
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"zshrc-additions.zsh"* ]]
+    grep -q 'SOME_TOOL_HOME' "$FTAZSH_HOME/zshrc/zshrc-additions.zsh"
+    grep -q '# ftazsh-carried: ' "$FTAZSH_HOME/zshrc/zshrc-additions.zsh"
+    grep -lq 'SOME_TOOL_HOME' "$HOME"/.zshrc-backup-*
+    backup_zshrc                                   # same file again: nothing new
+    [ "$(grep -c '# ftazsh-carried: ' "$FTAZSH_HOME/zshrc/zshrc-additions.zsh")" -eq 1 ]
+    run bash -c "ls $HOME/.zshrc-backup-* | wc -l"
+    [ "${output// /}" -eq 1 ]
+}
+
+@test "backup_zshrc backs up a changed managed .zshrc without guessing when no template was recorded" {
+    create_directories
+    { cat "$REPO_DIR/.zshrc"; echo 'export SOME_TOOL_HOME=1'; } > "$HOME/.zshrc"
+    run backup_zshrc
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"keeping a backup"* ]]
+    grep -lq 'SOME_TOOL_HOME' "$HOME"/.zshrc-backup-*
+    [ ! -e "$FTAZSH_HOME/zshrc/zshrc-additions.zsh" ]
 }
 
 @test "backup_zshrc is a no-op without a .zshrc" {
@@ -134,13 +173,44 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
-@test "install_plugin_repos removes legacy in-tree autosuggestions clone" {
+# oh-my-zsh now ships plugins/zsh-autosuggestions itself.
+bundle_autosuggestions_upstream() {
+    local upstream="$BATS_TEST_TMPDIR/fixtures/ohmyzsh"
+    mkdir -p "$upstream/plugins/zsh-autosuggestions"
+    echo "# bundled by oh-my-zsh" > "$upstream/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh"
+    git -C "$upstream" add -A
+    git -C "$upstream" -c user.email=t@t -c user.name=t commit -q -m "bundle zsh-autosuggestions"
+}
+
+@test "install_omz removes the original ftazsh's nested zsh-autosuggestions clone before pulling, so the update succeeds" {
     make_all_fixtures
     create_directories
     install_omz
-    mkdir -p "$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions"
-    install_plugin_repos
-    [ ! -d "$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions" ]
+    local omz="$FTAZSH_HOME/oh-my-zsh"
+    make_fake_clone "$omz/plugins/zsh-autosuggestions" "https://github.com/zsh-users/zsh-autosuggestions"
+    bundle_autosuggestions_upstream
+    run install_omz
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"update skipped"* ]]
+    [[ "$output" == *"Removed the original ftazsh's zsh-autosuggestions clone"* ]]
+    [ ! -d "$omz/plugins/zsh-autosuggestions/.git" ]
+    [ -f "$omz/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]
+    [ -z "$(git -C "$omz" status --porcelain)" ]
+}
+
+@test "install_omz and install_plugin_repos leave oh-my-zsh's own bundled zsh-autosuggestions alone" {
+    make_all_fixtures
+    bundle_autosuggestions_upstream
+    create_directories
+    install_omz
+    run install_plugin_repos
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"legacy"* ]]
+    [ -f "$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]
+    [ -z "$(git -C "$FTAZSH_HOME/oh-my-zsh" status --porcelain)" ]
+    run install_omz
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"update skipped"* ]]
 }
 
 @test "install_p10k clones the theme into custom/themes and re-runs cleanly" {
@@ -188,6 +258,59 @@ setup() {
     run migrate_legacy_install
     [ "$status" -eq 0 ]
     [ -z "$output" ]
+}
+
+@test "migrate_legacy_install seeds an empty zoxide with the old z plugin's ~/.z (zoxide 0.10 CLI)" {
+    create_directories
+    stub_zoxide
+    printf '/Users/me/code|42|1700000000\n' > "$HOME/.z"
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"~/.z"*zoxide* ]]
+    [ "$(grep -c 'zoxide import' "$STUB_LOG")" -eq 1 ]
+    grep -qx "zoxide import z" "$STUB_LOG"
+    [ -f "$HOME/.z" ]
+}
+
+@test "migrate_legacy_install falls back to zoxide 0.9's --from syntax" {
+    create_directories
+    stub_zoxide
+    export ZOXIDE_CLI=old
+    printf '/Users/me/code|42|1700000000\n' > "$HOME/.z"
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"~/.z"*zoxide* ]]
+    grep -qF -- "zoxide import --from z $HOME/.z" "$STUB_LOG"
+}
+
+@test "migrate_legacy_install leaves a zoxide database that already has history alone" {
+    create_directories
+    stub_zoxide
+    export ZOXIDE_IMPORT_ERROR="current database is not empty, specify --merge to continue anyway"
+    printf '/Users/me/code|42|1700000000\n' > "$HOME/.z"
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    [ "$(grep -c 'zoxide import' "$STUB_LOG")" -eq 1 ]
+}
+
+@test "migrate_legacy_install warns when the ~/.z import fails for another reason" {
+    create_directories
+    stub_zoxide
+    export ZOXIDE_IMPORT_ERROR="could not open database"
+    printf '/Users/me/code|42|1700000000\n' > "$HOME/.z"
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Could not import"*"could not open database"* ]]
+}
+
+@test "migrate_legacy_install does not call zoxide without a ~/.z" {
+    create_directories
+    stub_zoxide
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    ! grep -q zoxide "$STUB_LOG"
 }
 
 # ---------- ftazsh's own clone ----------
@@ -259,6 +382,7 @@ setup() {
     [ -x "$FTAZSH_HOME/bin/ftazsh" ]
     [ -x "$FTAZSH_HOME/bin/ftazsh-pager" ]
     [ -f "$FTAZSH_HOME/zshrc/personal_rc.zsh" ]
+    cmp -s "$REPO_DIR/.zshrc" "$FTAZSH_HOME/state/zshrc.installed"
     echo "FTAZSH_UPDATE_MODE=auto" > "$FTAZSH_HOME/settings.zsh"
     copy_config_files
     [ "$(cat "$FTAZSH_HOME/settings.zsh")" = "FTAZSH_UPDATE_MODE=auto" ]

@@ -248,6 +248,27 @@ _ftazsh_vcs_fixup() {
   return 0
 }
 
+# While gitstatusd's query is still in flight, p10k renders "loading" (or the
+# directory's cached status). gitstatusd can never answer for a reftable
+# repository, so seed p10k's cache from the git CLI: the branch shows at once,
+# also when the daemon is slow to start, hangs or is unavailable.
+_ftazsh_vcs_seed_cache() {
+  emulate -L zsh -o extended_glob
+  [[ -n $GIT_DIR ]] && return 0                 # p10k keys that case by GIT_DIR; the fixup covers it
+  _p9k_vcs_status_for_dir && return 0           # already cached for this directory
+  local dir=${_p9k__cwd_a:-$PWD}
+  local -a reply
+  _ftazsh_git_locate $dir || return 0
+  local gitdir=$reply[1] workdir=$reply[2]
+  _ftazsh_git_is_reftable $gitdir || return 0
+  _ftazsh_git_cli_status $workdir $gitdir || return 0
+  typeset -g VCS_STATUS_RESULT=ok-async
+  typeset -g _ftazsh_vcs_memo_sig="$gitdir|$VCS_STATUS_COMMIT|$VCS_STATUS_LOCAL_BRANCH|$VCS_STATUS_NUM_STAGED|$VCS_STATUS_NUM_UNSTAGED|$VCS_STATUS_NUM_UNTRACKED|$VCS_STATUS_STASHES"
+  typeset -gF _ftazsh_vcs_memo_time=EPOCHREALTIME
+  _p9k_vcs_status_save                          # p10k's cache (its fixup prelude is a memo hit)
+  return 0
+}
+
 # Prefix the two p10k functions. Idempotent; sets FTAZSH_P10K_SHIM=1 on success.
 _ftazsh_p10k_shim_install() {
   emulate -L zsh -o extended_glob
@@ -256,8 +277,9 @@ _ftazsh_p10k_shim_install() {
   for f in _p9k_vcs_status_save _p9k_vcs_render; do
     [[ $functions[$f] == *_ftazsh_vcs_fixup* ]] && continue
     if [[ $f == _p9k_vcs_render ]]; then
-      # While a query is in flight p10k re-renders from its cache (already fixed).
-      prelude='(( $+_p9k__gitstatus_next_dir )) || _ftazsh_vcs_fixup'
+      # Query in flight: p10k renders from its cache, seeded here for reftable
+      # repos. Otherwise fix up the fresh (or restored) status in place.
+      prelude='if (( $+_p9k__gitstatus_next_dir )); then _ftazsh_vcs_seed_cache; else _ftazsh_vcs_fixup; fi'
     else
       prelude='_ftazsh_vcs_fixup'
     fi

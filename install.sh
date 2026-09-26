@@ -423,13 +423,51 @@ prime_tools() {
 # Filesystem layout and configuration
 #######################################
 
+# The copy of ~/.zshrc exactly as ftazsh last installed it.
+installed_zshrc_copy() { printf '%s' "$FTAZSH_HOME/state/zshrc.installed"; }
+
+# Lines that other tools appended to the managed ~/.zshrc (nvm, conda, bun
+# and friends do this) are moved to a personal file, which ftazsh never
+# touches and every shell sources. A block already carried over is skipped.
+carry_over_zshrc_additions() {
+    local zshrc="$1" installed="$2" extra="$FTAZSH_HOME/zshrc/zshrc-additions.zsh"
+    local size block sum
+    size=$(( $(wc -c < "$installed") ))
+    block="$(tail -c +"$(( size + 1 ))" "$zshrc")"
+    [[ -n "${block//[[:space:]]/}" ]] || return 0
+    sum="$(printf '%s\n' "$block" | cksum | awk '{print $1}')"
+    if [[ -f "$extra" ]] && grep -qF "# ftazsh-carried: $sum" "$extra"; then
+        return 0
+    fi
+    mkdir -p "$FTAZSH_HOME/zshrc"
+    {
+        printf '\n# Lines other tools had appended to ~/.zshrc, moved here by ftazsh on %s.\n' "$(date +%Y-%m-%d)"
+        printf '# ftazsh-carried: %s\n' "$sum"
+        printf '%s\n' "$block"
+    } >> "$extra"
+    ok "Moved the lines other tools had appended to ~/.zshrc into ~/.config/ftazsh/zshrc/zshrc-additions.zsh (they keep working from there)"
+}
+
 backup_zshrc() {
     local zshrc="$HOME/.zshrc"
     [[ -f "$zshrc" ]] || return 0
 
     if grep -q "ftazsh-managed" "$zshrc"; then
-        info "Existing ~/.zshrc is ftazsh-managed; no backup needed."
-        return 0
+        local installed
+        installed="$(installed_zshrc_copy)"
+        if [[ -f "$installed" ]] && cmp -s "$installed" "$zshrc"; then
+            return 0                              # exactly as ftazsh installed it
+        fi
+        if [[ ! -f "$installed" ]] && cmp -s "$SCRIPT_DIR/.zshrc" "$zshrc"; then
+            return 0                              # already this version's file
+        fi
+        # Changed since ftazsh wrote it: keep a backup, and rescue what tools
+        # appended after ftazsh's own content.
+        if [[ -f "$installed" ]] && head -c "$(( $(wc -c < "$installed") ))" "$zshrc" | cmp -s - "$installed"; then
+            carry_over_zshrc_additions "$zshrc" "$installed"
+        else
+            info "The ftazsh-managed ~/.zshrc is not as installed; keeping a backup. Personal settings belong in ~/.config/ftazsh/zshrc/."
+        fi
     fi
 
     # Don't pile up identical backups (e.g. uninstall → reinstall cycles).
@@ -470,6 +508,18 @@ create_directories() {
 install_omz() {
     local dest="$FTAZSH_HOME/oh-my-zsh"
     if [[ -d "$dest/.git" ]]; then
+        # The original ftazsh cloned zsh-autosuggestions INSIDE the oh-my-zsh
+        # worktree. oh-my-zsh now ships its own plugins/zsh-autosuggestions,
+        # so such a nested clone makes the pull fail ("untracked working tree
+        # files would be overwritten"). Remove it first — only a nested git
+        # clone, never oh-my-zsh's own files — and restore whatever oh-my-zsh
+        # tracks there. ftazsh's own, current clone lives in custom/plugins.
+        local legacy="$dest/plugins/zsh-autosuggestions"
+        if [[ -d "$legacy/.git" ]]; then
+            rm -rf "$legacy"
+            git -C "$dest" checkout --quiet -- plugins/zsh-autosuggestions 2>/dev/null || true
+            ok "Removed the original ftazsh's zsh-autosuggestions clone from inside oh-my-zsh (ftazsh's copy is in custom/plugins)"
+        fi
         info "Updating oh-my-zsh..."
         git -C "$dest" pull --ff-only --quiet \
             || warn "oh-my-zsh update skipped (offline or local changes)."
@@ -484,14 +534,9 @@ install_plugin_repos() {
     local custom="$FTAZSH_HOME/oh-my-zsh/custom/plugins"
     mkdir -p "$custom"
 
-    # Older ftazsh versions cloned zsh-autosuggestions inside the oh-my-zsh
-    # worktree, which dirties its git status and breaks `omz update`.
-    local legacy="$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions"
-    if [[ -d "$legacy" ]]; then
-        warn "Removing legacy plugin clone inside the oh-my-zsh tree."
-        rm -rf "$legacy"
-    fi
-
+    # oh-my-zsh ships its own copies of zsh-autosuggestions and
+    # zsh-syntax-highlighting under plugins/; they are left alone. The clones
+    # below live in custom/plugins, which oh-my-zsh prefers, and stay current.
     local name dest
     for name in "${PLUGINS[@]}"; do
         dest="$custom/$name"
@@ -541,6 +586,19 @@ is_clone_of() {
 #   * the multi-gigabyte nerd-fonts clone inside the checkout (fonts come
 #     from Homebrew casks now)
 # The in-tree zsh-autosuggestions clone is handled by install_plugin_repos.
+# zoxide_import_z — imports the z plugin's ~/.z into zoxide. zoxide 0.10 made
+# the source a subcommand that finds ~/.z by itself (`zoxide import z`); 0.9
+# took `--from z PATH`. Prints zoxide's error message on failure.
+# shellcheck disable=SC2069  # stderr is what we want to capture
+zoxide_import_z() {
+    local err
+    err="$(zoxide import z 2>&1 >/dev/null)" && return 0
+    [[ "$err" == *"not empty"* ]] && { printf '%s\n' "$err"; return 1; }
+    err="$(zoxide import --from z "$HOME/.z" 2>&1 >/dev/null)" && return 0
+    printf '%s\n' "$err"
+    return 1
+}
+
 migrate_legacy_install() {
     local custom="$FTAZSH_HOME/oh-my-zsh/custom/plugins" f size
     local removed=()
@@ -573,6 +631,18 @@ migrate_legacy_install() {
         size="$(du -sh "$SCRIPT_DIR/nerd-fonts" 2>/dev/null | awk '{print $1}')"
         rm -rf "$SCRIPT_DIR/nerd-fonts"
         removed+=("nerd-fonts clone in the checkout (${size:-?}; fonts come from Homebrew now)")
+    fi
+    # The original ftazsh used oh-my-zsh's z plugin, which kept your directory
+    # history in ~/.z. Seed zoxide with it while zoxide's own database is still
+    # empty (zoxide refuses to import into a non-empty one without --merge, so
+    # this runs at most once and never touches history zoxide already has).
+    if [[ -s "$HOME/.z" ]] && command -v zoxide >/dev/null 2>&1; then
+        local import_err
+        if import_err="$(zoxide_import_z)"; then
+            ok "Imported the old z plugin's directory history (~/.z) into zoxide; ~/.z itself was left in place"
+        elif [[ "$import_err" != *"not empty"* ]]; then
+            warn "Could not import ~/.z into zoxide: ${import_err:-unknown error}"
+        fi
     fi
     if [[ "${#removed[@]}" -gt 0 ]]; then
         ok "Cleaned up leftovers of an older ftazsh version:"
@@ -654,6 +724,10 @@ copy_config_files() {
     info "Installing configuration files..."
     local f
     install_file "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"
+    # Remember what was installed, so the next run can tell lines other tools
+    # append to ~/.zshrc apart from ftazsh's own content (see backup_zshrc).
+    mkdir -p "$FTAZSH_HOME/state"
+    cp "$SCRIPT_DIR/.zshrc" "$(installed_zshrc_copy)"
     for f in "${MANAGED_FILES[@]}"; do
         install_file "$SCRIPT_DIR/$f" "$FTAZSH_HOME/$f"
     done

@@ -17,6 +17,7 @@ trap 'rm -rf "$SCRATCH"' EXIT
 
 export HOME="$SCRATCH"
 export FTAZSH_HOME="$HOME/.config/ftazsh"
+export _ZO_DATA_DIR="$SCRATCH/zoxide"   # zoxide's database stays inside the scratch HOME on every OS
 
 # Don't let the invoking shell's environment leak into the boots under test
 # (e.g. a developer's own FZF_* exports from a previous ftazsh install).
@@ -58,8 +59,11 @@ printf '#!/usr/bin/env bash\necho "UserShell: /bin/zsh"\n' > "$STUBS/dscl"
 chmod +x "$STUBS"/*
 export FTAZSH_FONT_DIR="$SCRATCH/fonts"
 
-# Pre-existing user state the installer must respect.
+# Pre-existing user state the installer must respect, including the directory
+# history of the original ftazsh's z plugin (~/.z), which zoxide should inherit.
 printf '[user]\n\tname = Integration\n[core]\n\tpager = less\n' > "$HOME/.gitconfig"
+mkdir -p "$HOME/legacy-jump-3c9e"
+printf '%s|42|%s\n' "$HOME/legacy-jump-3c9e" "$(date +%s)" > "$HOME/.z"
 
 echo "== Building layout in $SCRATCH using installer functions =="
 # shellcheck disable=SC1090
@@ -68,6 +72,7 @@ trap - ERR
 trap 'rm -rf "$SCRATCH"' EXIT   # re-arm cleanup (sourcing replaced nothing, but be explicit)
 SCRIPT_DIR="$UPSTREAM"          # install from the working-tree snapshot
 
+backup_zshrc
 create_directories
 install_omz
 migrate_legacy_install
@@ -78,9 +83,22 @@ copy_config_files
 configure_git
 record_install_state
 
+# Between installs: a tool appends to the managed ~/.zshrc (as nvm, conda or
+# bun do), and the original ftazsh's nested zsh-autosuggestions clone is
+# simulated inside oh-my-zsh's own (now bundled) plugin directory.
+echo 'export FROM_A_TOOL_APPEND=1' >> "$HOME/.zshrc"
+if [[ -d "$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions" ]]; then
+    git -C "$FTAZSH_HOME/oh-my-zsh/plugins/zsh-autosuggestions" init -q
+fi
+
+# zoxide's score for the imported entry; the re-run below must not import again.
+LEGACY_SCORE="$( (command -v zoxide >/dev/null && zoxide query -s legacy-jump-3c9e) 2>/dev/null || true)"
+
 echo "== Re-running installer steps (idempotency, real update paths) =="
+backup_zshrc
 create_directories
 install_omz
+migrate_legacy_install
 install_plugin_repos
 install_p10k
 sync_repo
@@ -167,10 +185,41 @@ check "history-substring-search widgets exist" \
     '[[ "$(whence -w history-substring-search-up)" == *function* ]]'
 check "zsh-completions on fpath" 'print -l $fpath | grep -q "custom/plugins/zsh-completions/src"'
 check "completion dump lands in ~/.cache/zsh" 'ls "$HOME/.cache/zsh"/.zcompdump* >/dev/null'
+check "PATH stays free of duplicates even when a tool re-exports it (typeset -U covers PATH itself)" \
+    'export PATH="/usr/bin:$PATH"; export PATH="/usr/bin:$PATH"; (( ${#path} == ${#${(@u)path}} ))'
+check "_git completion resolves to zsh's own function, never to Homebrew's site-functions" \
+    'typeset d first=; for d in $fpath; do [[ -e "$d/_git" ]] && { first="$d"; break; }; done; [[ -n "$first" && "$first" != *share/zsh/site-functions* ]]'
+check_bash "oh-my-zsh worktree is clean: bundled plugins untouched, nested legacy clone gone" \
+    '[ -z "$(git -C "$1" status --porcelain)" ] && [ ! -d "$1/plugins/zsh-autosuggestions/.git" ]' "$FTAZSH_HOME/oh-my-zsh"
+check "lines a tool appended to the managed ~/.zshrc still take effect (carried into zshrc/zshrc-additions.zsh)" \
+    '[[ "$FROM_A_TOOL_APPEND" == 1 ]]'
+check_bash "…and ~/.zshrc is ftazsh's file again, with a backup of the changed one" \
+    '! grep -q FROM_A_TOOL_APPEND "$HOME/.zshrc" && grep -q FROM_A_TOOL_APPEND "$1/zshrc/zshrc-additions.zsh" && grep -lq FROM_A_TOOL_APPEND "$HOME"/.zshrc-backup-*' "$FTAZSH_HOME"
 check "FZF_DEFAULT_OPTS set, old typo FZF_DEFAULT_OPS gone" \
     '[[ -n "$FZF_DEFAULT_OPTS" && -z "${FZF_DEFAULT_OPS:-}" ]]'
-check "zoxide active when present (z resolves, __zoxide_z is a function)" \
-    '! command -v zoxide >/dev/null || { whence z >/dev/null && [[ "$(whence -w __zoxide_z)" == *function* ]]; }'
+if command -v zoxide >/dev/null; then
+    check "zoxide: z and zi defined, chpwd hook installed" \
+        'whence z >/dev/null && whence zi >/dev/null && [[ "$(whence -w __zoxide_z)" == *function* ]] && (( ${chpwd_functions[(Ie)__zoxide_hook]} ))'
+    # zoxide registers its completion only when zle is active, i.e. in a real
+    # terminal, so this runs inside a pseudo-terminal (not a tty-less zsh -i -c).
+    # zoxide 0.10 registers it on `z`, 0.9 on `__zoxide_z`.
+    check_bash "zoxide: completion registered in a real terminal (init ran after compinit)" \
+        'out="$(zsh "$1" "$HOME" 1 "print ZOXIDE_COMPDEF=\${_comps[z]:-\${_comps[__zoxide_z]:-none}}")"; printf "%s\n" "$out" | grep -q "ZOXIDE_COMPDEF=__zoxide_z_complete"' \
+        "$REPO_DIR/tests/lib/render-prompt.zsh"
+    check "zoxide: zi picker preview uses eza when eza is present" \
+        '! command -v eza >/dev/null || [[ "$_ZO_FZF_OPTS" == *"--preview="*eza* ]]'
+    check_bash "zoxide: re-running the migration did not import ~/.z a second time" \
+        '[ -n "$1" ] && [ "$(zoxide query -s legacy-jump-3c9e)" = "$1" ]' "$LEGACY_SCORE"
+    check "zoxide: the old z plugin's history (~/.z) was imported and z jumps to it" \
+        'z legacy-jump-3c9e && [[ "${PWD:A}" == "${HOME:A}/legacy-jump-3c9e" ]]'
+    cp "$FTAZSH_HOME/settings.zsh" "$SCRATCH/settings.zoxide.bak"
+    echo "FTAZSH_ZOXIDE_CMD=cd" >> "$FTAZSH_HOME/settings.zsh"
+    check "zoxide: FTAZSH_ZOXIDE_CMD=cd makes zoxide the cd (cd jumps, cdi picks, plain paths still work)" \
+        '[[ "${aliases[cd]:-}${functions[cd]:-}" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "${PWD:A}" == "${HOME:A}/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
+    cp "$SCRATCH/settings.zoxide.bak" "$FTAZSH_HOME/settings.zsh"
+else
+    echo "skip: zoxide not installed here; its checks run in the macOS jobs"
+fi
 check "graceful degradation: no MANPAGER when bat is absent" \
     'command -v bat >/dev/null || [[ -z "${MANPAGER:-}" ]]'
 check "graceful degradation: no yazi wrapper / lazygit alias when absent" \
@@ -256,6 +305,19 @@ if git init -q --ref-format=reftable "$SCRATCH/probe" 2>/dev/null; then
     fi
     check_bash "prompt shows the reftable repo's branch" 'printf "%s\n" "$1" | grep -q rt-branch-9f2c' "$RENDER"
     check_bash "prompt never shows '.invalid'" '! printf "%s\n" "$1" | grep -q "\.invalid"' "$RENDER"
+    # While gitstatusd's query is in flight (slow start, hang), p10k would show
+    # "loading"; the shim seeds p10k's cache from the git CLI instead. Emulated
+    # inside the pseudo-terminal, where p10k is fully initialized.
+    INFLIGHT="$(env -u POWERLEVEL9K_DISABLE_GITSTATUS zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 1 \
+        'cd "'"$RT"'"; _p9k_fetch_cwd; _p9k__gitstatus_last=(); typeset -g _p9k__gitstatus_next_dir=""; typeset -g _p9k__prompt="" _p9k__prompt_side=$_p9k_vcs_side _p9k__segment_name=vcs; typeset -gi _p9k__has_upglob=0 _p9k__segment_index=_p9k_vcs_index _p9k__line_index=_p9k_vcs_line_index; _p9k_vcs_render; print -rP -- "INFLIGHT_RENDER=[$_p9k__prompt]"; unset _p9k__gitstatus_next_dir' 2>/dev/null || true)"
+    printf '%s\n' "$INFLIGHT" | grep '^INFLIGHT_RENDER=' | sed 's/^/    inflight: /'
+    check_bash "reftable prompt renders the branch from the git CLI while gitstatusd's query is still in flight (no 'loading')" \
+        'printf "%s\n" "$1" | grep "^INFLIGHT_RENDER=\[" | grep -q rt-branch-9f2c && ! printf "%s\n" "$1" | grep "^INFLIGHT_RENDER=\[" | grep -q loading' "$INFLIGHT"
+    # Control: with the seeding disabled, the same emulation must show p10k's "loading".
+    CONTROL="$(env -u POWERLEVEL9K_DISABLE_GITSTATUS zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$RT" 1 \
+        'cd "'"$RT"'"; _p9k_fetch_cwd; _p9k__gitstatus_last=(); functions[_ftazsh_vcs_seed_cache]="return 0"; typeset -g _p9k__gitstatus_next_dir=""; typeset -g _p9k__prompt="" _p9k__prompt_side=$_p9k_vcs_side _p9k__segment_name=vcs; typeset -gi _p9k__has_upglob=0 _p9k__segment_index=_p9k_vcs_index _p9k__line_index=_p9k_vcs_line_index; _p9k_vcs_render; print -rP -- "CONTROL_RENDER=[$_p9k__prompt]"; unset _p9k__gitstatus_next_dir' 2>/dev/null || true)"
+    check_bash "…control: without the seeding the emulation shows p10k's 'loading', so the check above is meaningful" \
+        'printf "%s\n" "$1" | grep "^CONTROL_RENDER=\[" | grep -q loading' "$CONTROL"
     FR="$SCRATCH/files-repo"
     git init -q --ref-format=files -b files-branch-4b1d "$FR"
     git -C "$FR" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init

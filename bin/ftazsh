@@ -234,6 +234,10 @@ cmd_update() {
             fi
         fi
         info "Updating ftazsh $(short "$local_sha") → $(short "$remote_sha")..."
+        # Keep the ~/.zshrc template of the version being replaced, so the
+        # installer can tell tool-appended lines from ftazsh's own content.
+        mkdir -p "$STATE"
+        [[ -f "$STATE/zshrc.installed" ]] || cp "$REPO/.zshrc" "$STATE/zshrc.installed" 2>/dev/null || true
         git -C "$REPO" reset --quiet --hard
         git -C "$REPO" checkout --quiet -B "$branch" FETCH_HEAD
     fi
@@ -377,8 +381,9 @@ cmd_doctor() {
         pass "Managed clone: $(git -C "$REPO" rev-parse --short HEAD) on $(repo_branch) from $(repo_url)"
     fi
     local legacy=()
+    # Only git clones count: oh-my-zsh itself ships plugins/zsh-autosuggestions now.
     for f in fzf marker oh-my-zsh/plugins/zsh-autosuggestions oh-my-zsh/custom/plugins/k oh-my-zsh/custom/plugins/zsh-history-substring-search; do
-        [[ -d "$FTAZSH_HOME/$f" ]] && legacy+=("$f")
+        [[ -d "$FTAZSH_HOME/$f/.git" ]] && legacy+=("$f")
     done
     if [[ "${#legacy[@]}" -gt 0 ]]; then
         note "Leftovers of an older ftazsh in $FTAZSH_HOME: ${legacy[*]} (run 'ftazsh update' or ./install.sh to clean up)"

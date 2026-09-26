@@ -51,6 +51,9 @@ jobs:
       POWERLEVEL9K_DISABLE_GITSTATUS: "true"
       # Silences the startup update check in every shell the job starts.
       FTAZSH_UPDATING: "1"
+      # zoxide's database for the jumps this job makes (a literal path: the
+      # runner context is not available in a job-level env).
+      _ZO_DATA_DIR: /tmp/ftazsh-ci-zoxide
     steps:
       - uses: actions/checkout@v5
         with:
@@ -113,9 +116,16 @@ jobs:
 
       - name: fzf and zoxide integrations are active
         run: |
-          zsh -i -c 'whence fzf-history-widget >/dev/null'
-          zsh -i -c 'whence __zoxide_z >/dev/null'
-          zsh -i -c '[[ -n "$FZF_DEFAULT_OPTS" ]]'
+          zsh -i -c 'whence fzf-history-widget >/dev/null && [[ -n "$FZF_DEFAULT_OPTS" ]]'
+          zsh -i -c 'whence z >/dev/null && whence zi >/dev/null && (( ${chpwd_functions[(Ie)__zoxide_hook]} ))'
+          zsh -i -c '[[ "$_ZO_FZF_OPTS" == *eza* ]]'
+          # zoxide registers its completion only when zle is active, i.e. in a
+          # real terminal: check it inside a pseudo-terminal, not a tty-less zsh -i -c.
+          # (zoxide 0.10 registers it on `z`, 0.9 on `__zoxide_z`.)
+          out="$(zsh tests/lib/render-prompt.zsh "$HOME" 1 'print ZOXIDE_COMPDEF=${_comps[z]:-${_comps[__zoxide_z]:-none}}')"
+          printf '%s\n' "$out" | grep -q 'ZOXIDE_COMPDEF=__zoxide_z_complete'
+          d="$RUNNER_TEMP/jump-me-51ab"; mkdir -p "$d"; zoxide add "$d"
+          zsh -i -c 'z jump-me-51ab && [[ "$PWD" == */jump-me-51ab ]]'
 
       - name: git config include and delta pager
         run: |

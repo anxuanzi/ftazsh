@@ -105,10 +105,17 @@ if command -v fzf >/dev/null; then
 fi
 
 #------------------------------------------------------------------------------
-# ZOXIDE — smarter cd:  z <fuzzy-dir>,  zi = interactive picker
+# ZOXIDE — smarter cd:  z <dir> jumps,  zi picks interactively,  z <dir> Space Tab
+# completes. FTAZSH_ZOXIDE_CMD=cd (settings.zsh) makes zoxide *be* cd (cd / cdi).
 #------------------------------------------------------------------------------
 if command -v zoxide >/dev/null; then
-    eval "$(zoxide init zsh)"
+    # zi's picker: zoxide's own fzf defaults, with the directory preview drawn
+    # by eza (icons, colors) instead of plain ls. Your own _ZO_FZF_OPTS wins.
+    if [[ -z "${_ZO_FZF_OPTS:-}" ]] && command -v eza >/dev/null; then
+        export _ZO_FZF_OPTS="--exact --no-sort --bind=ctrl-z:ignore,btab:up,tab:down --cycle --keep-right --border=sharp --height=45% --info=inline --layout=reverse --tabstop=1 --exit-0 --select-1 --preview='eza --group-directories-first --icons=always --color=always {2..}' --preview-window=down,30%,sharp"
+    fi
+    # After compinit (oh-my-zsh ran it), as zoxide requires for its completion.
+    eval "$(zoxide init zsh --cmd "${FTAZSH_ZOXIDE_CMD:-z}")"
 fi
 
 #------------------------------------------------------------------------------

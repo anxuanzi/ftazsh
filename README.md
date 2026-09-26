@@ -22,7 +22,7 @@ Intel). The installer refuses to run anywhere else. Works with Homebrew 5–7.
 | [fd](https://github.com/sharkdp/fd) | `find` | powers fzf file and directory search (respects `.gitignore`) |
 | [ripgrep](https://github.com/BurntSushi/ripgrep) | `grep` | installed, ready to use as `rg` |
 | [fzf](https://github.com/junegunn/fzf) | — | `Ctrl-R` history (`Ctrl-/` preview), `Ctrl-T` files, `Alt-C` cd |
-| [zoxide](https://github.com/ajeetdsouza/zoxide) | `cd` | `z <fuzzy-dir>` jumps, `zi` interactive picker |
+| [zoxide](https://github.com/ajeetdsouza/zoxide) | `cd` | `z <dir>` jumps, `zi` picks interactively (eza preview), `z <dir>` + `Space` `Tab` completes; `FTAZSH_ZOXIDE_CMD=cd` makes it your `cd` |
 | [jq](https://github.com/jqlang/jq) | — | installed, ready to use |
 | [delta](https://github.com/dandavison/delta) | git's diff pager | git pager and `git add -p` filter ([git defaults](#git-defaults-ftazsh-sets)) |
 | [difftastic](https://github.com/Wilfred/difftastic) | `diff` | `git dft`, `git dlog`, `git dshow` (structural diffs) |
@@ -171,9 +171,14 @@ That is the whole upgrade, whichever version you have:
   and the `~/.fzf.zsh` / `~/.fzf.bash` it generated, the `marker` clone, and
   the multi-gigabyte `nerd-fonts` clone inside the checkout. Only clones the
   old installer made are touched; a plugin you put there yourself stays.
-  marker's data in `~/.local/share/marker` is left alone. If one of your own
-  files in `zshrc/` still adds a removed plugin (`k`, `z`, `marker`), remove
-  that line to silence oh-my-zsh's warning.
+  (oh-my-zsh now ships its own `plugins/zsh-autosuggestions` and
+  `plugins/zsh-syntax-highlighting`; those are left alone, and ftazsh's
+  current clones in `custom/plugins` are the ones oh-my-zsh loads.)
+  marker's data in `~/.local/share/marker` is left alone. The `z` plugin's
+  directory history (`~/.z`) is imported into zoxide, so `z` keeps knowing
+  your directories (only while zoxide's own database is still empty; `~/.z`
+  itself stays). If one of your own files in `zshrc/` still adds a removed
+  plugin (`k`, `z`, `marker`), remove that line to silence oh-my-zsh's warning.
 
 `ftazsh doctor` points out any leftovers it still sees. Prefer a fresh start?
 `ftazsh reinstall` (or `./uninstall.sh` followed by `./install.sh`) gives you
@@ -204,6 +209,7 @@ which ftazsh never overwrites:
 FTAZSH_UPDATE_MODE=prompt        # prompt | auto | reminder | disabled
 FTAZSH_UPDATE_FREQUENCY_DAYS=7
 FTAZSH_UPDATE_TOOLS=1            # 0 = updates don't touch the Homebrew tools
+FTAZSH_ZOXIDE_CMD=z              # cd = zoxide becomes your cd (cd jumps, cdi picks)
 ```
 
 oh-my-zsh's own update prompts are disabled on purpose — ftazsh updates it.
@@ -337,7 +343,8 @@ export EDITOR="nvim"
 ./uninstall.sh --purge    # --tools plus their caches
 ```
 
-Always: restores your most recent `.zshrc` backup, removes ftazsh's git
+Always: restores the most recent backup of your own `.zshrc` (backups of
+ftazsh's file, kept when tools had appended to it, are skipped), removes ftazsh's git
 config include (your settings stay), backs up `~/.config/ftazsh/zshrc/` next
 to the `.zshrc` backups, removes `~/.config/ftazsh` and the caches ftazsh
 created. Never touched: Homebrew itself, `~/.zprofile`, your backups, zoxide's
@@ -417,6 +424,12 @@ shim is active (it needs `git.zsh` to be loaded — re-run `./install.sh`).
 `FTAZSH_UPDATE_MODE` other than `disabled`, and only when
 `~/.config/ftazsh/repo` exists; `ftazsh update --check` runs it by hand.
 
+**A tool appended lines to `~/.zshrc` (nvm, conda, bun … do that).**
+The next install or `ftazsh update` keeps a backup of the changed file and
+moves those lines into `~/.config/ftazsh/zshrc/zshrc-additions.zsh`, where
+they keep working and are never overwritten. Put your own settings there
+(or in any file in that directory) rather than in `~/.zshrc`.
+
 **Where did my old `.zshrc` go?** `~/.zshrc-backup-<timestamp>` — the
 installer prints the exact name when it backs it up.
 
@@ -445,7 +458,11 @@ installer prints the exact name when it backs it up.
 * Homebrew 6/7 compatibility: ask mode disabled for unattended runs, one
   explicit `brew update`, cask reinstall when font files went missing, Intel
   Tier-3 warning.
-* Managed files are replaced atomically; `~/.zshrc` backups are deduplicated.
+* Managed files are replaced atomically; `~/.zshrc` backups are deduplicated,
+  and lines other tools append to the managed `~/.zshrc` are carried over to
+  `zshrc/zshrc-additions.zsh` instead of being lost.
+* `PATH`/`FPATH` stay duplicate-free even when tools re-export them, and
+  Homebrew's completions sit behind zsh's own, so `git` completion is zsh's.
 * Tests: bats suites for installer, uninstaller and CLI; integration test with
   pseudo-terminal prompt rendering and the update flow; `make mac-test` for a
   sandboxed end-to-end run on your Mac.
