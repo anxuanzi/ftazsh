@@ -195,9 +195,10 @@ fonts_ok() {
 
 # zoxide registers its completion only when zle is active, i.e. in a real
 # terminal, so this runs inside a pseudo-terminal (not a tty-less zsh -i -c).
+# zoxide 0.10 registers it on `z`, 0.9 on `__zoxide_z`.
 zoxide_completion_ok() {
     local out
-    out="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$HOME" 1 'print ZOXIDE_COMPDEF=${_comps[__zoxide_z]:-none}')"
+    out="$(zsh "$REPO_DIR/tests/lib/render-prompt.zsh" "$HOME" 1 'print ZOXIDE_COMPDEF=${_comps[z]:-${_comps[__zoxide_z]:-none}}')"
     printf '%s\n' "$out" | tail -3
     printf '%s\n' "$out" | grep -q 'ZOXIDE_COMPDEF=__zoxide_z_complete'
 }
@@ -247,7 +248,7 @@ check "old z plugin history (~/.z) imported into zoxide; z jumps to it" zshi \
 cp "$FTAZSH_HOME/settings.zsh" "$SANDBOX/settings.zoxide.bak"
 echo "FTAZSH_ZOXIDE_CMD=cd" >> "$FTAZSH_HOME/settings.zsh"
 check "FTAZSH_ZOXIDE_CMD=cd makes zoxide the cd (cd jumps, cdi picks, plain paths still work)" zshi \
-    '[[ "$(whence cd)" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
+    '[[ "${aliases[cd]:-}${functions[cd]:-}" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
 cp "$SANDBOX/settings.zoxide.bak" "$FTAZSH_HOME/settings.zsh"
 check "eza alias runs" zshi 'cd "$HOME" && a >/dev/null'
 check "eza is the default ls with icons/colors/git (ls, ll, la, l, lt run)" zshi 'alias ls | grep -q eza && cd "$HOME" && ls >/dev/null && ll >/dev/null && la >/dev/null && l >/dev/null && lt >/dev/null'

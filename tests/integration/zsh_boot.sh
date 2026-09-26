@@ -182,8 +182,9 @@ if command -v zoxide >/dev/null; then
         'whence z >/dev/null && whence zi >/dev/null && [[ "$(whence -w __zoxide_z)" == *function* ]] && (( ${chpwd_functions[(Ie)__zoxide_hook]} ))'
     # zoxide registers its completion only when zle is active, i.e. in a real
     # terminal, so this runs inside a pseudo-terminal (not a tty-less zsh -i -c).
+    # zoxide 0.10 registers it on `z`, 0.9 on `__zoxide_z`.
     check_bash "zoxide: completion registered in a real terminal (init ran after compinit)" \
-        'out="$(zsh "$1" "$HOME" 1 "print ZOXIDE_COMPDEF=\${_comps[__zoxide_z]:-none}")"; printf "%s\n" "$out" | grep -q "ZOXIDE_COMPDEF=__zoxide_z_complete"' \
+        'out="$(zsh "$1" "$HOME" 1 "print ZOXIDE_COMPDEF=\${_comps[z]:-\${_comps[__zoxide_z]:-none}}")"; printf "%s\n" "$out" | grep -q "ZOXIDE_COMPDEF=__zoxide_z_complete"' \
         "$REPO_DIR/tests/lib/render-prompt.zsh"
     check "zoxide: zi picker preview uses eza when eza is present" \
         '! command -v eza >/dev/null || [[ "$_ZO_FZF_OPTS" == *"--preview="*eza* ]]'
@@ -194,7 +195,7 @@ if command -v zoxide >/dev/null; then
     cp "$FTAZSH_HOME/settings.zsh" "$SCRATCH/settings.zoxide.bak"
     echo "FTAZSH_ZOXIDE_CMD=cd" >> "$FTAZSH_HOME/settings.zsh"
     check "zoxide: FTAZSH_ZOXIDE_CMD=cd makes zoxide the cd (cd jumps, cdi picks, plain paths still work)" \
-        '[[ "$(whence cd)" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
+        '[[ "${aliases[cd]:-}${functions[cd]:-}" == *__zoxide_z* ]] && whence cdi >/dev/null && cd legacy-jump-3c9e && [[ "$PWD" == "$HOME/legacy-jump-3c9e" ]] && cd / && [[ "$PWD" == / ]]'
     cp "$SCRATCH/settings.zoxide.bak" "$FTAZSH_HOME/settings.zsh"
 else
     echo "skip: zoxide not installed here; its checks run in the macOS jobs"
