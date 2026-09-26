@@ -1,0 +1,596 @@
+#!/bin/bash
+# ftazsh — manage your ftazsh installation.
+#
+# Usage: ftazsh <command> [options]
+#
+#   update [--check] [--tools|--no-tools] [--yes]
+#                     Update ftazsh, oh-my-zsh, plugins, Powerlevel10k and (by
+#                     default) the Homebrew tools ftazsh manages. --check only
+#                     reports whether a new ftazsh version exists
+#                     (exit 0 = up to date, 1 = update available, 2 = error).
+#   doctor            Check the installation: Homebrew, git, tools, fonts,
+#                     config files, git config, prompt.
+#   version           Show the installed ftazsh version.
+#   reinstall [--yes] Clean uninstall + fresh install of the latest version
+#                     (keeps the Homebrew tools and your ~/.zshrc backups).
+#   uninstall [--yes] [--tools] [--purge]
+#                     Remove ftazsh; --tools also removes the Homebrew tools
+#                     and fonts, --purge their caches too.
+#   reftable status|on|off|migrate [DIR] [--yes]
+#                     Git reftable helpers: show ref formats, make new
+#                     repositories use reftable, or migrate one repository.
+#   help              Show this help.
+#
+# Compatible with the stock macOS bash 3.2.
+
+set -euo pipefail
+
+FTAZSH_HOME="${FTAZSH_HOME:-$HOME/.config/ftazsh}"
+REPO="$FTAZSH_HOME/repo"
+STATE="$FTAZSH_HOME/state"
+FTAZSH_REPO_URL_FALLBACK="https://github.com/anxuanzi/ftazsh.git"
+
+# Shells started by ftazsh's own scripts must not start update checks.
+export FTAZSH_UPDATING=1
+
+# Prefer Homebrew's tools (notably git) even when called from a shell that
+# has not set up Homebrew yet (e.g. the background update check).
+for _d in /opt/homebrew/bin /usr/local/bin; do
+    if [[ -x "$_d/brew" && ":$PATH:" != *":$_d:"* ]]; then
+        PATH="$_d:$PATH"
+    fi
+done
+unset _d
+export PATH
+
+# Reuse the tool list and helpers from the installer in the managed clone.
+if [[ -f "$REPO/install.sh" ]]; then
+    # shellcheck source=../install.sh
+    source "$REPO/install.sh"
+fi
+
+#######################################
+# Output helpers
+#######################################
+
+info() { printf '🔵  %s\n' "$*"; }
+ok()   { printf '✅  %s\n' "$*"; }
+warn() { printf '⚠️   %s\n' "$*" >&2; }
+err()  { printf '❌  %s\n' "$*" >&2; }
+
+usage() {
+    cat <<'EOF'
+Usage: ftazsh <command> [options]
+
+Commands:
+  update [--check] [--tools|--no-tools] [--yes]
+                    Update ftazsh, oh-my-zsh, plugins, Powerlevel10k and (by
+                    default) the Homebrew tools ftazsh manages.
+                    --check only reports whether a new ftazsh version exists
+                    (exit 0 = up to date, 1 = update available, 2 = error).
+  doctor            Check the installation (Homebrew, git, tools, fonts,
+                    config files, git config, prompt).
+  version           Show the installed ftazsh version.
+  reinstall [--yes] Clean uninstall + fresh install of the latest version
+                    (keeps the Homebrew tools and your ~/.zshrc backups).
+  uninstall [--yes] [--tools] [--purge]
+                    Remove ftazsh; --tools also removes the Homebrew tools
+                    and fonts, --purge their caches too.
+  reftable status|on|off|migrate [DIR] [--yes]
+                    Git reftable helpers: show ref formats, make new
+                    repositories use reftable, or migrate one repository.
+  help              Show this help.
+EOF
+}
+
+# confirm PROMPT  → 0 for yes (default yes)
+confirm() {
+    local reply
+    printf '%s [Y/n] ' "$1"
+    read -r reply
+    case "$reply" in
+        ''|y|Y|yes|YES) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# confirm_danger PROMPT → 0 for yes (default no)
+confirm_danger() {
+    local reply
+    printf '%s [y/N] ' "$1"
+    read -r reply
+    case "$reply" in
+        y|Y|yes|YES) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# version_ge A B → true when dotted version A >= B
+version_ge() {
+    local IFS=.
+    local -a av bv
+    read -r -a av <<< "$1"
+    read -r -a bv <<< "$2"
+    local i x y
+    for ((i = 0; i < ${#bv[@]}; i++)); do
+        x="${av[i]:-0}"; y="${bv[i]:-0}"
+        x="${x//[!0-9]/}"; y="${y//[!0-9]/}"
+        (( ${x:-0} > ${y:-0} )) && return 0
+        (( ${x:-0} < ${y:-0} )) && return 1
+    done
+    return 0
+}
+
+git_version() { git --version 2>/dev/null | awk '{print $3}'; }
+
+require_git_version() {
+    local have
+    have="$(git_version)"
+    if ! version_ge "${have:-0}" "$1"; then
+        err "This needs git ≥ $1 (you have ${have:-none}). Run ./install.sh or 'ftazsh update' to get Homebrew's git."
+        return 1
+    fi
+}
+
+require_repo() {
+    if [[ ! -d "$REPO/.git" ]]; then
+        err "The managed ftazsh clone ($REPO) is missing. Re-run install.sh from a checkout of ftazsh."
+        return 1
+    fi
+}
+
+repo_branch() { git -C "$REPO" config --get ftazsh.branch 2>/dev/null || echo main; }
+repo_url()    { git -C "$REPO" remote get-url origin 2>/dev/null || echo "$FTAZSH_REPO_URL_FALLBACK"; }
+short()       { printf '%s' "${1:0:7}"; }
+
+#######################################
+# version
+#######################################
+
+cmd_version() {
+    if [[ -d "$REPO/.git" ]]; then
+        local sha date
+        sha="$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+        date="$(git -C "$REPO" log -1 --format=%cd --date=short 2>/dev/null || echo unknown)"
+        echo "ftazsh $sha ($date) on $(repo_branch) — updates from $(repo_url)"
+    else
+        echo "ftazsh (unknown version: managed clone $REPO missing)"
+    fi
+}
+
+#######################################
+# update
+#######################################
+
+# write_check_state SECONDS — schedule the next background check.
+write_check_state() {
+    local now
+    now="$(date +%s)"
+    mkdir -p "$STATE"
+    printf 'last=%s\nnext=%s\n' "$now" "$(( now + $1 ))" > "$STATE/update-check"
+}
+
+run_installer() {
+    local tools="$1"
+    local args=(--unattended)
+    [[ "$tools" == 1 ]] && args+=(--upgrade)
+    /bin/bash "$REPO/install.sh" "${args[@]}"
+    rm -f "$STATE/update-available" "$STATE/update-snooze"
+    ok "Done. Open a new terminal (or run: exec zsh) to pick up the new configuration."
+}
+
+cmd_update() {
+    local check=0 background=0 yes=0 tools="${FTAZSH_UPDATE_TOOLS:-1}"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --check)      check=1 ;;
+            --background) check=1; background=1 ;;
+            --no-tools)   tools=0 ;;
+            --tools)      tools=1 ;;
+            -y|--yes)     yes=1 ;;
+            -h|--help)    usage; return 0 ;;
+            *) err "update: unknown option '$1'"; return 2 ;;
+        esac
+        shift
+    done
+    require_repo || return 2
+    local days="${FTAZSH_UPDATE_FREQUENCY_DAYS:-7}"
+    case "$days" in ''|*[!0-9]*) days=7 ;; esac
+    local branch
+    branch="$(repo_branch)"
+
+    if ! git -C "$REPO" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 \
+            fetch --quiet origin "$branch" 2>/dev/null; then
+        if (( background )); then
+            write_check_state 3600      # retry in an hour
+            return 0
+        fi
+        err "Could not fetch $(repo_url) ($branch). Offline?"
+        return 2
+    fi
+    local local_sha remote_sha behind
+    local_sha="$(git -C "$REPO" rev-parse HEAD)"
+    remote_sha="$(git -C "$REPO" rev-parse FETCH_HEAD)"
+    behind="$(git -C "$REPO" rev-list --count HEAD..FETCH_HEAD 2>/dev/null || echo '?')"
+    write_check_state $(( days * 86400 ))
+
+    if [[ "$local_sha" == "$remote_sha" ]]; then
+        rm -f "$STATE/update-available"
+        if (( check )); then
+            (( background )) || ok "ftazsh is up to date ($(short "$local_sha") on $branch)."
+            return 0
+        fi
+        info "ftazsh itself is up to date ($(short "$local_sha") on $branch); refreshing the rest."
+    else
+        printf '%s %s\n' "$remote_sha" "$behind" > "$STATE/update-available"
+        if (( check )); then
+            (( background )) || info "Update available: $behind new commit(s) on $branch ($(short "$local_sha") → $(short "$remote_sha")). Run: ftazsh update"
+            return 1
+        fi
+        if (( ! yes )) && [[ -t 0 ]]; then
+            if ! confirm "Update ftazsh $(short "$local_sha") → $(short "$remote_sha") ($behind new commit(s))?"; then
+                info "Aborted; nothing was changed."
+                return 0
+            fi
+        fi
+        info "Updating ftazsh $(short "$local_sha") → $(short "$remote_sha")..."
+        git -C "$REPO" reset --quiet --hard
+        git -C "$REPO" checkout --quiet -B "$branch" FETCH_HEAD
+    fi
+    run_installer "$tools"
+}
+
+#######################################
+# doctor
+#######################################
+
+DOCTOR_PROBLEMS=0
+pass() { printf '✅  %s\n' "$*"; }
+fail() { printf '❌  %s\n' "$*"; DOCTOR_PROBLEMS=$(( DOCTOR_PROBLEMS + 1 )); }
+note() { printf '⚠️   %s\n' "$*"; }
+
+# formula_bin FORMULA → the executable it provides
+formula_bin() {
+    case "$1" in
+        ripgrep)    echo rg ;;
+        git-delta)  echo delta ;;
+        tealdeer)   echo tldr ;;
+        difftastic) echo difft ;;
+        *)          echo "$1" ;;
+    esac
+}
+
+cmd_doctor() {
+    local brew_prefix="" git_path="" git_ver="" f
+    echo "ftazsh doctor — $(cmd_version)"
+    echo
+
+    # --- system -------------------------------------------------------------
+    if [[ "$(uname -s)" == Darwin ]]; then
+        pass "macOS $(sw_vers -productVersion 2>/dev/null || echo '?') on $(uname -m)"
+        [[ "$(uname -m)" == x86_64 ]] \
+            && note "Intel Mac: Homebrew builds no new bottles for Intel since September 2026."
+    else
+        note "Not macOS ($(uname -s)): ftazsh targets macOS; some checks are skipped."
+    fi
+
+    # --- Homebrew -----------------------------------------------------------
+    if command -v brew >/dev/null 2>&1; then
+        brew_prefix="$(brew --prefix 2>/dev/null || true)"
+        pass "Homebrew $(brew --version 2>/dev/null | head -1 | awk '{print $2}') at ${brew_prefix:-?}"
+    else
+        fail "Homebrew not found on PATH (open a new terminal, or run ./install.sh)."
+    fi
+
+    # --- git ----------------------------------------------------------------
+    if command -v git >/dev/null 2>&1; then
+        git_path="$(command -v git)"
+        git_ver="$(git_version)"
+        if [[ -n "$brew_prefix" && "$git_path" == "$brew_prefix/bin/git" ]]; then
+            pass "git $git_ver is Homebrew's ($git_path) — the default git"
+        elif [[ -n "$brew_prefix" && -x "$brew_prefix/bin/git" ]]; then
+            fail "git on PATH is $git_path ($git_ver), not Homebrew's $brew_prefix/bin/git ($("$brew_prefix/bin/git" --version | awk '{print $3}')). Open a new terminal; ftazshrc.zsh puts Homebrew first on PATH."
+        elif [[ -n "$brew_prefix" ]]; then
+            fail "Homebrew's git is not installed (git on PATH: $git_path, $git_ver). Run ./install.sh."
+        else
+            note "git $git_ver at $git_path"
+        fi
+        if version_ge "${git_ver:-0}" 2.45; then
+            pass "git $git_ver supports reftable (git init --ref-format=reftable, git refs migrate)"
+        else
+            fail "git $git_ver is older than 2.45: no reftable support."
+        fi
+        if [[ "$(uname -s)" == Darwin && "$git_path" != /usr/bin/git ]] && xcode-select -p >/dev/null 2>&1; then
+            note "Apple's git: $(/usr/bin/git --version 2>/dev/null || echo unknown) (shadowed, not used)"
+        fi
+    else
+        fail "git not found."
+    fi
+
+    # --- tools --------------------------------------------------------------
+    if [[ -n "${FORMULAE+x}" ]]; then
+        local b missing=()
+        for f in "${FORMULAE[@]}"; do
+            b="$(formula_bin "$f")"
+            command -v "$b" >/dev/null 2>&1 || missing+=("$f")
+        done
+        if [[ "${#missing[@]}" -eq 0 ]]; then
+            pass "All ${#FORMULAE[@]} managed tools are installed (${FORMULAE[*]})"
+        else
+            fail "Missing tools: ${missing[*]} (run ./install.sh or 'ftazsh update')"
+        fi
+        local fdir="${FTAZSH_FONT_DIR:-$HOME/Library/Fonts}"
+        if [[ -n "${CASKS+x}" ]] && type cask_font_file >/dev/null 2>&1; then
+            local c fnt missing_nerd=() missing_plain=()
+            for c in "${CASKS[@]}"; do
+                fnt="$(cask_font_file "$c")"
+                [[ -n "$fnt" && ! -f "$fdir/$fnt" ]] || continue
+                if [[ -n "$(cask_nerd_zip "$c")" ]]; then
+                    missing_nerd+=("$c")
+                else
+                    missing_plain+=("$c")
+                fi
+            done
+            if [[ "${#missing_nerd[@]}" -eq 0 && "${#missing_plain[@]}" -eq 0 ]]; then
+                pass "All ${#CASKS[@]} font families installed in $fdir"
+            fi
+            if [[ "${#missing_nerd[@]}" -gt 0 ]]; then
+                fail "Nerd Fonts missing in $fdir: ${missing_nerd[*]} (run ./install.sh)"
+            fi
+            if [[ "${#missing_plain[@]}" -gt 0 ]]; then
+                note "Optional fonts missing in $fdir: ${missing_plain[*]} (brew install --cask ${missing_plain[*]})"
+            fi
+        elif [[ -f "$fdir/JetBrainsMonoNerdFont-Regular.ttf" && -f "$fdir/HackNerdFont-Regular.ttf" ]]; then
+            pass "Nerd Fonts installed in $fdir"
+        else
+            fail "Nerd Font files missing in $fdir (run ./install.sh)"
+        fi
+    else
+        fail "Managed ftazsh clone missing ($REPO); run ./install.sh from a checkout (tool checks skipped)."
+    fi
+
+    # --- configuration ------------------------------------------------------
+    if [[ -f "$HOME/.zshrc" ]] && grep -q "ftazsh-managed" "$HOME/.zshrc"; then
+        pass "Managed .zshrc in place (~/.zshrc)"
+    else
+        fail "No ftazsh-managed ~/.zshrc (run ./install.sh)"
+    fi
+    local missing_cfg=()
+    for f in ftazshrc.zsh tools.zsh git.zsh update.zsh p10k.zsh gitconfig settings.zsh bin/ftazsh bin/ftazsh-pager; do
+        [[ -e "$FTAZSH_HOME/$f" ]] || missing_cfg+=("$f")
+    done
+    if [[ "${#missing_cfg[@]}" -eq 0 ]]; then
+        pass "Config files present in $FTAZSH_HOME"
+    else
+        fail "Missing in $FTAZSH_HOME: ${missing_cfg[*]} (run ./install.sh)"
+    fi
+    local omz="$FTAZSH_HOME/oh-my-zsh"
+    if [[ -d "$omz/.git" && -d "$omz/custom/themes/powerlevel10k/.git" \
+          && -d "$omz/custom/plugins/zsh-autosuggestions/.git" \
+          && -d "$omz/custom/plugins/zsh-syntax-highlighting/.git" \
+          && -d "$omz/custom/plugins/zsh-completions/.git" ]]; then
+        pass "oh-my-zsh, plugins and Powerlevel10k present"
+    else
+        fail "oh-my-zsh, a plugin or Powerlevel10k is missing (run ./install.sh)"
+    fi
+    if [[ -d "$REPO/.git" ]]; then
+        pass "Managed clone: $(git -C "$REPO" rev-parse --short HEAD) on $(repo_branch) from $(repo_url)"
+    fi
+    local legacy=()
+    for f in fzf marker oh-my-zsh/plugins/zsh-autosuggestions oh-my-zsh/custom/plugins/k oh-my-zsh/custom/plugins/zsh-history-substring-search; do
+        [[ -d "$FTAZSH_HOME/$f" ]] && legacy+=("$f")
+    done
+    if [[ "${#legacy[@]}" -gt 0 ]]; then
+        note "Leftovers of an older ftazsh in $FTAZSH_HOME: ${legacy[*]} (run 'ftazsh update' or ./install.sh to clean up)"
+    fi
+
+    # --- git config ---------------------------------------------------------
+    if git config --global --get-all include.path 2>/dev/null | grep -qxF "$FTAZSH_HOME/gitconfig"; then
+        pass "git config includes ftazsh defaults ($FTAZSH_HOME/gitconfig)"
+        local pager
+        pager="$(git config --get core.pager 2>/dev/null || true)"
+        if [[ "$pager" == *ftazsh-pager* ]]; then
+            if command -v delta >/dev/null 2>&1; then
+                pass "git pager: delta (via ftazsh-pager)"
+            else
+                note "git pager: delta is not installed, ftazsh-pager falls back to less"
+            fi
+        else
+            note "core.pager is '${pager:-unset}' (your setting overrides ftazsh's delta pager)"
+        fi
+    else
+        fail "git config does not include $FTAZSH_HOME/gitconfig (run ./install.sh)"
+    fi
+    local fmt
+    fmt="$(git config --global --get init.defaultRefFormat 2>/dev/null || true)"
+    if [[ -n "$fmt" ]]; then
+        note "New repositories use the '$fmt' ref format (init.defaultRefFormat; 'ftazsh reftable off' reverts)"
+    else
+        pass "New repositories use git's default ref format (files until Git 3.0); 'ftazsh reftable on' opts in"
+    fi
+
+    # --- shell & prompt -----------------------------------------------------
+    local login_shell=""
+    if command -v dscl >/dev/null 2>&1; then
+        login_shell="$(dscl . -read "/Users/${USER:-$(id -un)}" UserShell 2>/dev/null | awk '{print $2}' || true)"
+    fi
+    login_shell="${login_shell:-${SHELL:-}}"
+    if [[ "${login_shell##*/}" == zsh ]]; then
+        pass "Login shell is zsh ($login_shell)"
+    else
+        fail "Login shell is ${login_shell:-unknown}; run: chsh -s /bin/zsh"
+    fi
+    if command -v zsh >/dev/null 2>&1; then
+        if POWERLEVEL9K_INSTANT_PROMPT=off \
+           POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true POWERLEVEL9K_DISABLE_GITSTATUS=true \
+           zsh -ic '(( FTAZSH_P10K_SHIM ))' >/dev/null 2>&1; then
+            pass "Prompt: reftable-safe git status shim is active"
+        else
+            fail "Prompt: the reftable shim is not active (git.zsh not loaded, or Powerlevel10k internals changed)"
+        fi
+    fi
+
+    # --- updates ------------------------------------------------------------
+    if [[ -r "$STATE/update-available" ]]; then
+        note "An ftazsh update is available: run 'ftazsh update'"
+    fi
+    local last=""
+    if [[ -r "$STATE/update-check" ]]; then
+        last="$(grep '^last=' "$STATE/update-check" | cut -d= -f2)"
+    fi
+    if [[ -n "$last" ]]; then
+        pass "Auto-update mode: ${FTAZSH_UPDATE_MODE:-prompt}; last check $(date -r "$last" +%Y-%m-%d 2>/dev/null || echo '?')"
+    fi
+
+    echo
+    if (( DOCTOR_PROBLEMS > 0 )); then
+        err "$DOCTOR_PROBLEMS problem(s) found."
+        return 1
+    fi
+    ok "Everything looks good."
+}
+
+#######################################
+# reftable
+#######################################
+
+cmd_reftable() {
+    local sub="${1:-status}"
+    [[ $# -gt 0 ]] && shift
+    local yes=0 dir="."
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -y|--yes) yes=1 ;;
+            -h|--help) usage; return 0 ;;
+            -*) err "reftable: unknown option '$1'"; return 2 ;;
+            *) dir="$1" ;;
+        esac
+        shift
+    done
+    case "$sub" in
+        status)
+            echo "git: $(git --version 2>/dev/null || echo 'not found')"
+            local fmt
+            fmt="$(git config --global --get init.defaultRefFormat 2>/dev/null || true)"
+            [[ -n "$fmt" ]] || fmt="files (git default until Git 3.0)"
+            echo "New repositories: $fmt"
+            if git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
+                echo "This repository:  $(git -C "$dir" rev-parse --show-ref-format 2>/dev/null || echo 'unknown (git < 2.45)')"
+            fi
+            ;;
+        on)
+            require_git_version 2.45 || return 1
+            git config --global init.defaultRefFormat reftable
+            ok "New repositories (git init / git clone) will use reftable."
+            note "Tools built on libgit2 (some Git GUIs) cannot open reftable repositories yet; 'ftazsh reftable off' reverts."
+            ;;
+        off)
+            git config --global --unset init.defaultRefFormat 2>/dev/null || true
+            ok "New repositories use git's default ref format again."
+            ;;
+        migrate)
+            require_git_version 2.46 || return 1
+            local top cur
+            if ! top="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)"; then
+                err "$dir is not inside a git work tree."
+                return 1
+            fi
+            cur="$(git -C "$top" rev-parse --show-ref-format)"
+            if [[ "$cur" == reftable ]]; then
+                ok "$top already uses reftable."
+                return 0
+            fi
+            if [[ "$(git -C "$top" worktree list 2>/dev/null | wc -l | tr -d ' ')" -gt 1 ]]; then
+                err "git cannot migrate a repository with linked worktrees; remove them first (git worktree remove …)."
+                return 1
+            fi
+            if (( ! yes )); then
+                confirm_danger "Migrate $top from '$cur' to reftable? (git refs migrate; reflogs are kept)" \
+                    || { info "Aborted; nothing was changed."; return 0; }
+            fi
+            git -C "$top" refs migrate --ref-format=reftable
+            ok "$top now uses $(git -C "$top" rev-parse --show-ref-format)."
+            ;;
+        *)
+            err "reftable: unknown subcommand '$sub' (status|on|off|migrate)"
+            return 2
+            ;;
+    esac
+}
+
+#######################################
+# reinstall / uninstall
+#######################################
+
+# Copy the managed clone somewhere safe: the scripts delete $FTAZSH_HOME.
+stage_repo_copy() {
+    local tmp
+    tmp="$(mktemp -d "${TMPDIR:-/tmp}/ftazsh-stage.XXXXXX")"
+    cp -R "$REPO" "$tmp/ftazsh"
+    printf '%s' "$tmp"
+}
+
+cmd_reinstall() {
+    local yes=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -y|--yes) yes=1 ;;
+            -h|--help) usage; return 0 ;;
+            *) err "reinstall: unknown option '$1'"; return 2 ;;
+        esac
+        shift
+    done
+    require_repo || return 2
+    if (( ! yes )); then
+        confirm_danger "Remove ftazsh completely (keeping Homebrew tools) and install the latest version fresh?" \
+            || { info "Aborted; nothing was changed."; return 0; }
+    fi
+    local stage branch
+    stage="$(stage_repo_copy)"
+    branch="$(repo_branch)"
+    if git -C "$stage/ftazsh" fetch --quiet origin "$branch" 2>/dev/null; then
+        git -C "$stage/ftazsh" reset --quiet --hard
+        git -C "$stage/ftazsh" checkout --quiet -B "$branch" FETCH_HEAD
+        info "Reinstalling ftazsh $(git -C "$stage/ftazsh" rev-parse --short HEAD) ($branch)..."
+    else
+        warn "Could not fetch the latest ftazsh (offline?); reinstalling the current version."
+    fi
+    /bin/bash "$stage/ftazsh/uninstall.sh" --yes
+    local args=()
+    (( yes )) && args+=(--unattended)
+    /bin/bash "$stage/ftazsh/install.sh" ${args[@]+"${args[@]}"}
+    rm -rf "$stage"
+}
+
+cmd_uninstall() {
+    require_repo || return 2
+    local stage
+    stage="$(stage_repo_copy)"
+    /bin/bash "$stage/ftazsh/uninstall.sh" "$@"
+    local status=$?
+    rm -rf "$stage"
+    return "$status"
+}
+
+#######################################
+# main
+#######################################
+
+main() {
+    local cmd="${1:-help}"
+    [[ $# -gt 0 ]] && shift
+    case "$cmd" in
+        update)    cmd_update "$@" ;;
+        doctor)    cmd_doctor "$@" ;;
+        version|--version|-v) cmd_version ;;
+        reinstall) cmd_reinstall "$@" ;;
+        uninstall) cmd_uninstall "$@" ;;
+        reftable)  cmd_reftable "$@" ;;
+        help|-h|--help) usage ;;
+        *) usage >&2; err "Unknown command: $cmd"; return 2 ;;
+    esac
+}
+
+if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

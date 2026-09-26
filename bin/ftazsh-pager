@@ -1,0 +1,34 @@
+#!/bin/bash
+# ftazsh git pager: delta when it is installed, otherwise what git would use
+# anyway. ~/.config/ftazsh/gitconfig points core.pager and
+# interactive.diffFilter here so git keeps working even if git-delta is
+# uninstalled (or is not on PATH for the process running git).
+set -u
+
+find_delta() {
+    local d
+    if command -v delta >/dev/null 2>&1; then
+        command -v delta
+        return 0
+    fi
+    for d in /opt/homebrew/bin/delta /usr/local/bin/delta; do
+        if [[ -x "$d" ]]; then
+            printf '%s' "$d"
+            return 0
+        fi
+    done
+    return 1
+}
+
+if delta_bin="$(find_delta)"; then
+    exec "$delta_bin" "$@"
+fi
+
+# No delta. `--color-only` means git is using us as interactive.diffFilter,
+# which must pass the diff through untouched; otherwise act as the pager.
+for arg in "$@"; do
+    if [[ "$arg" == "--color-only" ]]; then
+        exec cat
+    fi
+done
+exec less

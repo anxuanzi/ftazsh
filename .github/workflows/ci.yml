@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:   # run the whole suite on demand from the Actions tab
 
 jobs:
   linux:
@@ -24,13 +25,20 @@ jobs:
       - name: Fix runner zsh directory permissions
         run: sudo chmod -R g-w,o-w /usr/share/zsh
 
+      - name: Toolchain versions
+        run: |
+          zsh --version
+          git --version   # runner images ship a recent git (>= 2.45 needed for reftable tests)
+          bats --version
+          shellcheck --version
+
       - name: Lint (shellcheck + zsh -n)
         run: make lint
 
       - name: Unit tests (bats)
         run: make unit
 
-      - name: Integration test (real zsh boot)
+      - name: Integration test (real zsh boot, reftable prompt, update flow)
         run: make integration
 
   macos:
@@ -41,8 +49,21 @@ jobs:
       POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD: "true"
       POWERLEVEL9K_INSTANT_PROMPT: "off"
       POWERLEVEL9K_DISABLE_GITSTATUS: "true"
+      # Silences the startup update check in every shell the job starts.
+      FTAZSH_UPDATING: "1"
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # PR checkouts are detached; give the managed clone a real branch and a
+      # local "upstream" so the update flow can be exercised without network.
+      - name: Prepare a local upstream for the update flow
+        run: |
+          git checkout -B ci-upstream
+          git config user.name ci && git config user.email ci@example.com
+          echo "FTAZSH_REPO_URL=file://$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          echo "FTAZSH_REPO_BRANCH=ci-upstream" >> "$GITHUB_ENV"
 
       - name: Run installer end to end (unattended)
         run: ./install.sh --unattended
@@ -50,10 +71,31 @@ jobs:
       - name: Modern tools are on PATH
         run: |
           failed=0
-          for t in eza bat fd rg fzf zoxide jq; do
+          for t in git eza bat fd rg fzf zoxide jq delta difft lazygit gh dust duf procs btop sd hyperfine tldr yazi; do
             if command -v "$t"; then :; else echo "missing: $t"; failed=1; fi
           done
           exit "$failed"
+
+      - name: All font families are installed
+        run: |
+          source ./install.sh
+          missing=""
+          for c in "${CASKS[@]}"; do
+            f="$(cask_font_file "$c")"
+            [ -f "$HOME/Library/Fonts/$f" ] || missing="$missing $c"
+          done
+          echo "font files in ~/Library/Fonts: $(ls "$HOME/Library/Fonts" | wc -l | tr -d ' ')"
+          [ -z "$missing" ] || { echo "missing:$missing"; exit 1; }
+
+      - name: Homebrew's git is the default git in ftazsh shells
+        run: |
+          want="$(brew --prefix)/bin/git"
+          got="$(zsh -i -c 'command -v git')"
+          echo "git resolves to: $got (want $want)"
+          [ "$got" = "$want" ]
+          zsh -i -c 'git --version'
+          v="$(zsh -i -c 'git --version' | awk '{print $3}')"
+          case "$v" in 2.4[5-9]*|2.[5-9]*|[3-9].*) echo "git $v is reftable-capable" ;; *) echo "git $v too old"; exit 1 ;; esac
 
       - name: Managed .zshrc is installed
         run: grep -q "ftazsh-managed" "$HOME/.zshrc"
@@ -75,5 +117,63 @@ jobs:
           zsh -i -c 'whence __zoxide_z >/dev/null'
           zsh -i -c '[[ -n "$FZF_DEFAULT_OPTS" ]]'
 
+      - name: git config include and delta pager
+        run: |
+          git config --global --get-all include.path | grep -qx "$HOME/.config/ftazsh/gitconfig"
+          git config --get core.pager | grep -q ftazsh-pager
+          printf 'diff --git a/x b/x\n' | "$HOME/.config/ftazsh/bin/ftazsh-pager" --color-only >/dev/null
+
+      # The runner user's login shell is not zsh; that is the one doctor
+      # finding this job tolerates (the summary line is the second ❌).
+      - name: ftazsh CLI — version and doctor
+        run: |
+          zsh -i -c 'ftazsh version'
+          out="$(zsh -i -c 'ftazsh doctor' 2>&1)" && rc=0 || rc=$?
+          printf '%s\n' "$out"
+          if [ "$rc" -ne 0 ]; then
+            [ "$(printf '%s\n' "$out" | grep -c '❌')" -eq 2 ] && printf '%s\n' "$out" | grep -q 'Login shell'
+          fi
+
+      - name: Prompt shows the branch of a reftable repository
+        run: |
+          d="$RUNNER_TEMP/rt-repo"
+          git init -q --ref-format=reftable -b rt-branch-9f2c "$d"
+          git -C "$d" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+          git -C "$d" rev-parse --show-ref-format | grep -qx reftable
+          out="$(zsh tests/lib/render-prompt.zsh "$d" 120 '' rt-branch-9f2c)"
+          printf '%s\n' "$out" | tail -8
+          printf '%s\n' "$out" | grep -q 'rt-branch-9f2c'
+          if printf '%s\n' "$out" | grep -q '\.invalid'; then echo "prompt showed .invalid"; exit 1; fi
+          zsh -i -c "ftazsh reftable status $d" | grep -q 'This repository:  reftable'
+
+      - name: Update flow against the local upstream
+        run: |
+          zsh -i -c 'ftazsh update --check'
+          git commit --allow-empty -q -m "upstream change"
+          if zsh -i -c 'ftazsh update --check'; then echo "expected an update to be reported"; exit 1; fi
+          zsh -i -c 'ftazsh update --yes --no-tools'
+          zsh -i -c 'ftazsh update --check'
+          [ "$(git -C "$HOME/.config/ftazsh/repo" rev-parse HEAD)" = "$(git rev-parse HEAD)" ]
+
       - name: Re-run installer (idempotency)
         run: ./install.sh --unattended
+
+      - name: Uninstall restores the previous state
+        run: |
+          ./uninstall.sh --yes
+          [ ! -d "$HOME/.config/ftazsh" ]
+          if [ -f "$HOME/.zshrc" ] && grep -q ftazsh-managed "$HOME/.zshrc"; then echo "managed .zshrc left behind"; exit 1; fi
+          if git config --global --get-all include.path 2>/dev/null | grep -q ftazsh; then echo "git include left behind"; exit 1; fi
+
+  macos-smoke:
+    name: Sandboxed smoke test (macOS, real gitstatusd)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The same script a maintainer runs with `make mac-test`: a real install
+      # into a throwaway HOME with the real Homebrew and gitstatusd, the
+      # reftable prompt and migration, the update flow and reminder, an
+      # idempotent re-install, uninstall, and cleanup of what it installed.
+      - name: Run tests/macos/smoke.sh
+        run: bash tests/macos/smoke.sh --yes
