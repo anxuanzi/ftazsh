@@ -190,15 +190,27 @@ setup() {
     [ -z "$output" ]
 }
 
-@test "migrate_legacy_install seeds an empty zoxide with the old z plugin's ~/.z" {
+@test "migrate_legacy_install seeds an empty zoxide with the old z plugin's ~/.z (zoxide 0.10 CLI)" {
     create_directories
     stub_zoxide
     printf '/Users/me/code|42|1700000000\n' > "$HOME/.z"
     run migrate_legacy_install
     [ "$status" -eq 0 ]
     [[ "$output" == *"~/.z"*zoxide* ]]
-    grep -qF -- "zoxide import --from z $HOME/.z" "$STUB_LOG"
+    [ "$(grep -c 'zoxide import' "$STUB_LOG")" -eq 1 ]
+    grep -qx "zoxide import z" "$STUB_LOG"
     [ -f "$HOME/.z" ]
+}
+
+@test "migrate_legacy_install falls back to zoxide 0.9's --from syntax" {
+    create_directories
+    stub_zoxide
+    export ZOXIDE_CLI=old
+    printf '/Users/me/code|42|1700000000\n' > "$HOME/.z"
+    run migrate_legacy_install
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"~/.z"*zoxide* ]]
+    grep -qF -- "zoxide import --from z $HOME/.z" "$STUB_LOG"
 }
 
 @test "migrate_legacy_install leaves a zoxide database that already has history alone" {
@@ -209,6 +221,7 @@ setup() {
     run migrate_legacy_install
     [ "$status" -eq 0 ]
     [ -z "$output" ]
+    [ "$(grep -c 'zoxide import' "$STUB_LOG")" -eq 1 ]
 }
 
 @test "migrate_legacy_install warns when the ~/.z import fails for another reason" {

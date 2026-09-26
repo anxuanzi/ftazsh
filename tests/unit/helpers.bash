@@ -69,15 +69,24 @@ STUB
     chmod +x "$STUB_BIN/brew" "$STUB_BIN/chsh" "$STUB_BIN/dscl"
 }
 
-# zoxide stub (opt-in): logs calls; `zoxide import` fails with the message in
-# $ZOXIDE_IMPORT_ERROR when that is set.
+# zoxide stub (opt-in): logs calls. `zoxide import` speaks the 0.10 CLI
+# (`import z`, data file auto-detected) or, with ZOXIDE_CLI=old, the 0.9 CLI
+# (`import --from z PATH`); it fails with the message in $ZOXIDE_IMPORT_ERROR
+# when that is set.
 stub_zoxide() {
     cat > "$STUB_BIN/zoxide" <<'STUB'
 #!/usr/bin/env bash
 echo "zoxide $*" >> "$STUB_LOG"
-if [[ "${1:-}" == import && -n "${ZOXIDE_IMPORT_ERROR:-}" ]]; then
-    echo "zoxide: $ZOXIDE_IMPORT_ERROR" >&2
-    exit 1
+if [[ "${1:-}" == import ]]; then
+    if [[ -n "${ZOXIDE_IMPORT_ERROR:-}" ]]; then
+        echo "zoxide: $ZOXIDE_IMPORT_ERROR" >&2
+        exit 1
+    fi
+    if [[ "${ZOXIDE_CLI:-new}" == old ]]; then
+        [[ "${2:-}" == --from ]] || { echo "error: unexpected argument '${2:-}' found" >&2; exit 2; }
+    else
+        [[ "${2:-}" == z && $# -eq 2 ]] || { echo "error: unexpected argument '${2:-}' found" >&2; exit 2; }
+    fi
 fi
 exit 0
 STUB

@@ -541,6 +541,19 @@ is_clone_of() {
 #   * the multi-gigabyte nerd-fonts clone inside the checkout (fonts come
 #     from Homebrew casks now)
 # The in-tree zsh-autosuggestions clone is handled by install_plugin_repos.
+# zoxide_import_z — imports the z plugin's ~/.z into zoxide. zoxide 0.10 made
+# the source a subcommand that finds ~/.z by itself (`zoxide import z`); 0.9
+# took `--from z PATH`. Prints zoxide's error message on failure.
+# shellcheck disable=SC2069  # stderr is what we want to capture
+zoxide_import_z() {
+    local err
+    err="$(zoxide import z 2>&1 >/dev/null)" && return 0
+    [[ "$err" == *"not empty"* ]] && { printf '%s\n' "$err"; return 1; }
+    err="$(zoxide import --from z "$HOME/.z" 2>&1 >/dev/null)" && return 0
+    printf '%s\n' "$err"
+    return 1
+}
+
 migrate_legacy_install() {
     local custom="$FTAZSH_HOME/oh-my-zsh/custom/plugins" f size
     local removed=()
@@ -580,8 +593,7 @@ migrate_legacy_install() {
     # this runs at most once and never touches history zoxide already has).
     if [[ -s "$HOME/.z" ]] && command -v zoxide >/dev/null 2>&1; then
         local import_err
-        # shellcheck disable=SC2069  # stderr is what we want to capture
-        if import_err="$(zoxide import --from z "$HOME/.z" 2>&1 >/dev/null)"; then
+        if import_err="$(zoxide_import_z)"; then
             ok "Imported the old z plugin's directory history (~/.z) into zoxide; ~/.z itself was left in place"
         elif [[ "$import_err" != *"not empty"* ]]; then
             warn "Could not import ~/.z into zoxide: ${import_err:-unknown error}"
